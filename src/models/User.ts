@@ -5,7 +5,7 @@ interface IUser {
   email: string,
   password: string,
   avatar?: string,
-  bio: string,
+  bio?: string,
   role: "user" | "admin",
   isVerified: boolean,
   followers: Types.ObjectId[],
@@ -18,8 +18,8 @@ const userSchema = new Schema<IUser>({
     type: String,
     unique: true,
     trim: true,
-    minLength: 3,
-    maxLength: 30,
+    minLength: [3, "Must be at least 3 characters"],
+    maxLength: [30, "Must be less than 30 characters"],
     required: true
   },
   email: {
@@ -43,7 +43,10 @@ const userSchema = new Schema<IUser>({
   },
   role: {
     type: String,
-    enum: ["user", "admin"],
+    enum: {
+      values: ["user", "admin"],
+      message: "Role must be either user or admin"
+    },
     default: "user"
   },
   isVerified: {

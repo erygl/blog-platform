@@ -8,5 +8,7 @@ const getEnv = (key: string): string => {
 
 export const env = {
   dbUrl: getEnv("MONGO_URI"),
-  port: Number(process.env.PORT) || 5000
+  port: Number(process.env.PORT) || 5000,
+  accessTokenSecret: getEnv("ACCESS_TOKEN_SECRET"),
+  refreshTokenSecret: getEnv("REFRESH_TOKEN_SECRET"),
 }
