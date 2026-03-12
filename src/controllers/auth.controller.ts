@@ -1,17 +1,19 @@
 import type { Request, Response } from "express"
-import { registerUser, loginUser } from "../services/auth.service.js"
+import {
+  registerUser,
+  loginUser,
+  logoutUser,
+  verifyUser
+} from "../services/auth.service.js"
 
 const register = async (req: Request, res: Response) => {
   const user = await registerUser(req.body)
-  
+
   res.status(201).json({ user })
 }
 
 const login = async (req: Request, res: Response) => {
-  const {
-    accessToken,
-    refreshToken
-  } = await loginUser(req.body)
+  const { accessToken, refreshToken } = await loginUser(req.body)
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
@@ -22,7 +24,22 @@ const login = async (req: Request, res: Response) => {
   res.status(200).json({ accessToken })
 }
 
+const logout = async (req: Request, res: Response) => {
+  await logoutUser(req.user!)
+  res.clearCookie("refreshToken")
+  res.status(200).json({ message: "Logged out successfully" })
+}
+
+
+const verifyEmail = async (req: Request, res: Response) => {
+  await verifyUser(req.query)
+  res.status(200).json({ message: "Email verified successfully" })
+}
+
+
 export {
   register,
-  login
+  login,
+  logout,
+  verifyEmail
 }

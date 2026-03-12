@@ -1,11 +1,16 @@
 import bcrypt from "bcryptjs"
 import User from "../models/User.js"
-import { UnauthorizedError } from "../errors/index.js"
+import { BadRequestError, UnauthorizedError } from "../errors/index.js"
 import {
   createAccessToken,
-  createRefreshToken
+  createRefreshToken,
+  createVerificationToken,
+  verifyVerificationToken,
+  type AccessTokenPayload
 } from "../utils/token.js"
+import { sendVerificationEmail } from "../utils/email.js"
 import { registerSchema, loginSchema } from "../validations/auth.validation.js"
+import type { ParsedQs } from "qs"
 
 
 const registerUser = async (input: unknown) => {
@@ -16,6 +21,10 @@ const registerUser = async (input: unknown) => {
   const user = await User.create({
     username, email, password: hashedPassword, bio, avatar
   })
+
+  const verificationToken = createVerificationToken(user._id.toString())
+  await sendVerificationEmail(user.email, verificationToken)
+
   return {
     username: user.username,
     email: user.email,
@@ -49,7 +58,26 @@ const loginUser = async (input: unknown) => {
   return { accessToken, refreshToken }
 }
 
+const logoutUser = async (payload: AccessTokenPayload): Promise<void> => {
+  await User.findByIdAndUpdate(payload.userId, { refreshToken: null })
+}
+
+const verifyUser = async (query: ParsedQs): Promise<void> => {
+  const { token } = query
+  if (!token || typeof token !== "string") throw new BadRequestError("Token is missing")
+
+  const { userId } = verifyVerificationToken(token)
+
+  const user = await User.findOneAndUpdate(
+    { _id: userId, isVerified: false },
+    { isVerified: true }
+  )
+  if (!user) throw new BadRequestError("Email already verified or user not found")
+}
+
 export {
   registerUser,
-  loginUser
+  loginUser,
+  logoutUser,
+  verifyUser
 }
