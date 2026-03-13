@@ -3,7 +3,9 @@ import {
   registerUser,
   loginUser,
   logoutUser,
-  verifyUser
+  verifyUserEmail,
+  sendPasswordResetEmail,
+  resetUserPassword
 } from "../services/auth.service.js"
 
 const register = async (req: Request, res: Response) => {
@@ -17,7 +19,7 @@ const login = async (req: Request, res: Response) => {
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
   })
@@ -32,14 +34,25 @@ const logout = async (req: Request, res: Response) => {
 
 
 const verifyEmail = async (req: Request, res: Response) => {
-  await verifyUser(req.query)
+  await verifyUserEmail(req.query)
   res.status(200).json({ message: "Email verified successfully" })
 }
 
+const forgottenPassword = async (req: Request, res: Response) => {
+  await sendPasswordResetEmail(req.body)
+  res.status(200).json({ message: "Reset link sent" })
+}
+
+const resetPassword = async (req: Request, res: Response) => {
+  await resetUserPassword(req.query, req.body)
+  res.status(200).json({ message: "Password updated successfully" })
+}
 
 export {
   register,
   login,
   logout,
-  verifyEmail
+  verifyEmail,
+  forgottenPassword,
+  resetPassword
 }

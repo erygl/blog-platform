@@ -10,7 +10,9 @@ interface IUser {
   isVerified: boolean,
   followers: Types.ObjectId[],
   following: Types.ObjectId[],
-  refreshToken: string | null
+  refreshToken?: string | null,
+  passwordResetToken?: string | null,
+  passwordResetTokenExpiry?: Date | null
 }
 
 const userSchema = new Schema<IUser>({
@@ -57,6 +59,16 @@ const userSchema = new Schema<IUser>({
   following: [{ type: Schema.Types.ObjectId, ref: "User" }],
   refreshToken: {
     type: String,
+    select: false,
+    default: null
+  },
+  passwordResetToken: {
+    type: String,
+    select: false,
+    default: null
+  },
+  passwordResetTokenExpiry: {
+    type: Date,
     select: false,
     default: null
   }

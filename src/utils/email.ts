@@ -18,3 +18,18 @@ export const sendVerificationEmail = async (userEmail: string, token: string) =>
     throw new AppError("Failed to send verification email", 500)
   }
 }
+
+export const sendResetEmail = async (userEmail: string, token: string) => {
+  const { error } = await resend.emails.send({
+    from: "blog-platform <onboarding@resend.dev>",
+    to: [userEmail],
+    subject: "Reset your password",
+    html: `<p>Please click link below to reset your password</p>
+    <a href="${env.appUrl}/api/auth/reset-password?token=${token}">Reset Password</a>`,
+  });
+
+  if (error) {
+    console.error("Resend error: ", error)
+    throw new AppError("Failed to send reset email", 500)
+  }
+}

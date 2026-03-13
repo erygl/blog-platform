@@ -7,10 +7,6 @@ export interface AccessTokenPayload {
   userRole: "user" | "admin"
 }
 
-interface RefreshTokenPayload {
-  userId: string
-}
-
 const createAccessToken = (payload: AccessTokenPayload): string => {
   return jwt.sign(payload, env.accessTokenSecret, { expiresIn: "15m" })
 }
@@ -24,13 +20,13 @@ const verifyAccessToken = (token: string): AccessTokenPayload => {
   }
 }
 
-const createRefreshToken = (payload: RefreshTokenPayload): string => {
-  return jwt.sign(payload, env.refreshTokenSecret, { expiresIn: "7d" })
+const createRefreshToken = (userId: string): string => {
+  return jwt.sign({ userId }, env.refreshTokenSecret, { expiresIn: "7d" })
 }
 
-const verifyRefreshToken = (token: string): RefreshTokenPayload => {
+const verifyRefreshToken = (token: string): { userId: string } => {
   try {
-    return jwt.verify(token, env.refreshTokenSecret) as RefreshTokenPayload
+    return jwt.verify(token, env.refreshTokenSecret) as { userId: string }
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) throw new UnauthorizedError("Refresh token has expired")
     throw new UnauthorizedError("Invalid refresh token")
