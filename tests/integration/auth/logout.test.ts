@@ -15,7 +15,7 @@ describe("POST api/auth/logout", () => {
 
   beforeEach(async () => {
     await registerUser()
-    accessToken = await loginUser()
+    accessToken = (await loginUser()).accessToken
   })
 
   it("should logout successfully", async () => {

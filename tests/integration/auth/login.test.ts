@@ -21,6 +21,7 @@ describe("POST api/auth/login", () => {
       })
     expect(res.status).toBe(200)
     expect(res.body).toHaveProperty("accessToken")
+    expect(res.headers["set-cookie"]).toBeDefined()
   })
 
   it("should return 401, if credentials wrong", async () => {

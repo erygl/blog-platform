@@ -28,5 +28,8 @@ export async function loginUser() {
       email: "john@example.com",
       password: "Password1"
     })
-  return res.body.accessToken as string
+  return {
+    accessToken: res.body.accessToken as string,
+    refreshToken: res.headers["set-cookie"] as unknown as string[]
+  }
 }
