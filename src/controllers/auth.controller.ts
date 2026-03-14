@@ -5,7 +5,8 @@ import {
   logoutUser,
   verifyUserEmail,
   sendPasswordResetEmail,
-  resetUserPassword
+  resetUserPassword,
+  refreshAccessToken
 } from "../services/auth.service.js"
 
 const register = async (req: Request, res: Response) => {
@@ -32,7 +33,6 @@ const logout = async (req: Request, res: Response) => {
   res.status(200).json({ message: "Logged out successfully" })
 }
 
-
 const verifyEmail = async (req: Request, res: Response) => {
   await verifyUserEmail(req.query)
   res.status(200).json({ message: "Email verified successfully" })
@@ -48,11 +48,17 @@ const resetPassword = async (req: Request, res: Response) => {
   res.status(200).json({ message: "Password updated successfully" })
 }
 
+const refresh = async (req: Request, res: Response) => {
+  const newAccessToken = await refreshAccessToken(req.cookies.refreshToken)
+  res.status(200).json({ accessToken: newAccessToken })
+}
+
 export {
   register,
   login,
   logout,
   verifyEmail,
   forgottenPassword,
-  resetPassword
+  resetPassword,
+  refresh
 }

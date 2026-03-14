@@ -7,6 +7,24 @@ class AppError extends Error {
   }
 }
 
+class BadRequestError extends AppError {
+  constructor(message: string = "Bad Request") {
+    super(message, 400)
+  }
+}
+
+class UnauthorizedError extends AppError {
+  constructor(message: string = "Not authorized") {
+    super(message, 401)
+  }
+}
+
+class ForbiddenError extends AppError {
+  constructor(message: string = "Forbidden") {
+    super(message, 403)
+  }
+}
+
 class NotFoundError extends AppError {
   constructor(message: string = "Not found") {
     super(message, 404)
@@ -19,22 +37,12 @@ class ConflictError extends AppError {
   }
 }
 
-class UnauthorizedError extends AppError {
-  constructor(message: string = "Not authorized") {
-    super(message, 401)
-  }
-}
-
-class BadRequestError extends AppError {
-  constructor(message: string = "Bad Request") {
-    super(message, 400)
-  }
-}
 
 export {
   AppError,
+  BadRequestError,
+  UnauthorizedError,
+  ForbiddenError,
   NotFoundError,
   ConflictError,
-  UnauthorizedError,
-  BadRequestError
 }

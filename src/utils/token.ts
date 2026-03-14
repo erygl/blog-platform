@@ -4,7 +4,8 @@ import { UnauthorizedError } from "../errors/index.js"
 
 export interface AccessTokenPayload {
   userId: string,
-  userRole: "user" | "admin"
+  userRole: "user" | "admin",
+  isVerified: boolean
 }
 
 const createAccessToken = (payload: AccessTokenPayload): string => {

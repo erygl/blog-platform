@@ -2,13 +2,13 @@ import bcrypt from "bcryptjs"
 import User from "../models/User.js"
 import {
   BadRequestError,
-  NotFoundError,
   UnauthorizedError
 } from "../errors/index.js"
 import {
   createAccessToken,
   createRefreshToken,
   createVerificationToken,
+  verifyRefreshToken,
   verifyVerificationToken,
   type AccessTokenPayload
 } from "../utils/token.js"
@@ -57,7 +57,8 @@ const loginUser = async (input: unknown) => {
 
   const accessToken = createAccessToken({
     userId: user._id.toString(),
-    userRole: user.role
+    userRole: user.role,
+    isVerified: user.isVerified
   })
 
   const refreshToken = createRefreshToken(user._id.toString())
@@ -131,11 +132,33 @@ const resetUserPassword = async (query: ParsedQs, input: unknown)
   await user.save()
 }
 
+const refreshAccessToken = async (refreshToken: string) => {
+  if (!refreshToken || typeof refreshToken !== "string")
+    throw new BadRequestError("Token is missing")
+
+  const { userId } = verifyRefreshToken(refreshToken)
+  const user = await User.findById(userId).select("+refreshToken")
+  if (!user || !user.refreshToken)
+    throw new UnauthorizedError("Invalid refresh token")
+
+  const isValid = await bcrypt.compare(refreshToken, user.refreshToken)
+  if (!isValid) throw new UnauthorizedError("Invalid refresh token")
+
+  const newAccessToken = createAccessToken({
+    userId: user._id.toString(),
+    userRole: user.role,
+    isVerified: user.isVerified
+  })
+
+  return newAccessToken
+}
+
 export {
   registerUser,
   loginUser,
   logoutUser,
   verifyUserEmail,
   sendPasswordResetEmail,
-  resetUserPassword
+  resetUserPassword,
+  refreshAccessToken
 }
