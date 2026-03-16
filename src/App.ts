@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit"
 import cookieParser from "cookie-parser"
 import helmet from "helmet"
 import authRouter from "./routes/auth.routes.js"
+import userRouter from "./routes/user.routes.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 
 const app: Application = express()
@@ -18,6 +19,7 @@ const authLimiter = rateLimit({
 })
 
 app.use("/api/auth", authLimiter, authRouter)
+app.use("/api/users", userRouter)
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" })
 })
