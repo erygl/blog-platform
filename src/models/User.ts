@@ -4,15 +4,15 @@ interface IUser {
   username: string,
   email: string,
   password: string,
-  avatar?: string,
-  bio?: string,
+  avatar: string | null,
+  bio: string,
   role: "user" | "admin",
   isVerified: boolean,
   followers: Types.ObjectId[],
   following: Types.ObjectId[],
-  refreshToken?: string | null,
-  passwordResetToken?: string | null,
-  passwordResetTokenExpiry?: Date | null
+  refreshToken: string | null,
+  passwordResetToken: string | null,
+  passwordResetTokenExpiry: Date | null
 }
 
 const userSchema = new Schema<IUser>({
@@ -37,7 +37,8 @@ const userSchema = new Schema<IUser>({
     required: true
   },
   avatar: {
-    type: String
+    type: String,
+    default: null
   },
   bio: {
     type: String,
@@ -55,8 +56,20 @@ const userSchema = new Schema<IUser>({
     type: Boolean,
     default: false
   },
-  followers: [{ type: Schema.Types.ObjectId, ref: "User" }],
-  following: [{ type: Schema.Types.ObjectId, ref: "User" }],
+  followers: {
+    type: [{
+      type: Schema.Types.ObjectId,
+      ref: "User"
+    }],
+    default: []
+  },
+  following: {
+    type: [{
+      type: Schema.Types.ObjectId,
+      ref: "User"
+    }],
+    default: []
+  },
   refreshToken: {
     type: String,
     select: false,
