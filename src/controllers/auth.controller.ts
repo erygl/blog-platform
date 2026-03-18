@@ -1,14 +1,21 @@
 import type { Request, Response } from "express"
 import * as authService from "../services/auth.service.js"
+import * as authValidation from "../validations/auth.validation.js"
+import {
+  BadRequestError,
+  UnauthorizedError
+} from "../errors/index.js"
 
 const register = async (req: Request, res: Response) => {
-  const user = await authService.registerUser(req.body)
+  const input = authValidation.registerSchema.parse(req.body)
+  const user = await authService.registerUser(input)
 
   res.status(201).json({ user })
 }
 
 const login = async (req: Request, res: Response) => {
-  const { accessToken, refreshToken } = await authService.loginUser(req.body)
+  const { email, password } = authValidation.loginSchema.parse(req.body)
+  const { accessToken, refreshToken } = await authService.loginUser(email, password)
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
@@ -20,28 +27,40 @@ const login = async (req: Request, res: Response) => {
 }
 
 const logout = async (req: Request, res: Response) => {
-  await authService.logoutUser(req.user!)
+  const userId = req.user!.userId
+  await authService.logoutUser(userId)
   res.clearCookie("refreshToken")
   res.status(200).json({ message: "Logged out successfully" })
 }
 
 const verifyEmail = async (req: Request, res: Response) => {
-  await authService.verifyUserEmail(req.query)
+  const token = req.query.token
+  if (!token || typeof token !== "string")
+    throw new BadRequestError("Token is missing")
+  await authService.verifyUserEmail(token)
   res.status(200).json({ message: "Email verified successfully" })
 }
 
 const forgottenPassword = async (req: Request, res: Response) => {
-  await authService.sendPasswordResetEmail(req.body)
+  const { email } = authValidation.forgetPasswordSchema.parse(req.body)
+  await authService.sendPasswordResetEmail(email)
   res.status(200).json({ message: "Reset link sent" })
 }
 
 const resetPassword = async (req: Request, res: Response) => {
-  await authService.resetUserPassword(req.query, req.body)
+  const token = req.query.token
+  if (!token || typeof token !== "string")
+    throw new BadRequestError("Token is missing")
+  const { password } = authValidation.resetPasswordSchema.parse(req.body)
+  await authService.resetUserPassword(token, password)
   res.status(200).json({ message: "Password updated successfully" })
 }
 
 const refresh = async (req: Request, res: Response) => {
-  const newAccessToken = await authService.refreshAccessToken(req.cookies.refreshToken)
+  const refreshToken = req.cookies.refreshToken
+  if (!refreshToken)
+    throw new UnauthorizedError("Token is missing")
+  const newAccessToken = await authService.refreshAccessToken(refreshToken)
   res.status(200).json({ accessToken: newAccessToken })
 }
 

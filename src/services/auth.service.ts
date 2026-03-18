@@ -9,28 +9,22 @@ import {
   createRefreshToken,
   createVerificationToken,
   verifyRefreshToken,
-  verifyVerificationToken,
-  type AccessTokenPayload
+  verifyVerificationToken
 } from "../utils/token.js"
 import { sendVerificationEmail, sendResetEmail } from "../utils/email.js"
-import {
-  registerSchema,
-  loginSchema,
-  forgetPasswordSchema,
-  resetPasswordSchema
-} from "../validations/auth.validation.js"
-import type { ParsedQs } from "qs"
 import crypto from "crypto"
 
 
-const registerUser = async (input: unknown) => {
-  const { username, email, password, bio, avatar } = registerSchema.parse(input)
+const registerUser = async (input: {
+  username: string,
+  email: string,
+  password: string;
+  bio?: string,
+  avatar?: string,
+}) => {
+  const hashedPassword = await bcrypt.hash(input.password, 10)
 
-  const hashedPassword = await bcrypt.hash(password, 10)
-
-  const user = await User.create({
-    username, email, password: hashedPassword, bio, avatar
-  })
+  const user = await User.create({ ...input, password: hashedPassword })
 
   const verificationToken = createVerificationToken(user._id.toString())
   await sendVerificationEmail(user.email, verificationToken)
@@ -42,8 +36,7 @@ const registerUser = async (input: unknown) => {
   }
 }
 
-const loginUser = async (input: unknown) => {
-  const { email, password } = loginSchema.parse(input)
+const loginUser = async (email: string, password: string) => {
   const user = await User.findOne({ email }).select("+password")
 
   if (!user) {
@@ -69,15 +62,11 @@ const loginUser = async (input: unknown) => {
   return { accessToken, refreshToken }
 }
 
-const logoutUser = async (payload: AccessTokenPayload): Promise<void> => {
-  await User.findByIdAndUpdate(payload.userId, { refreshToken: null })
+const logoutUser = async (userId: string): Promise<void> => {
+  await User.findByIdAndUpdate(userId, { refreshToken: null })
 }
 
-const verifyUserEmail = async (query: ParsedQs): Promise<void> => {
-  const { token } = query
-  if (!token || typeof token !== "string")
-    throw new BadRequestError("Token is missing")
-
+const verifyUserEmail = async (token: string): Promise<void> => {
   const { userId } = verifyVerificationToken(token)
 
   const user = await User.findOneAndUpdate(
@@ -87,9 +76,7 @@ const verifyUserEmail = async (query: ParsedQs): Promise<void> => {
   if (!user) throw new BadRequestError("Email already verified or user not found")
 }
 
-const sendPasswordResetEmail = async (input: unknown): Promise<void> => {
-  const { email } = forgetPasswordSchema.parse(input)
-
+const sendPasswordResetEmail = async (email: string): Promise<void> => {
   const user = await User.findOne({ email })
   if (user) {
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -104,14 +91,10 @@ const sendPasswordResetEmail = async (input: unknown): Promise<void> => {
   }
 }
 
-const resetUserPassword = async (query: ParsedQs, input: unknown)
-  : Promise<void> => {
-  const { token } = query
-  if (!token || typeof token !== "string")
-    throw new BadRequestError("Token is missing")
-
-  const { password } = resetPasswordSchema.parse(input)
-
+const resetUserPassword = async (
+  token: string,
+  password: string
+): Promise<void> => {
   const hashedToken = crypto.createHash("sha256").update(token).digest("hex")
 
   const user = await User.findOne({ passwordResetToken: hashedToken })
@@ -133,9 +116,6 @@ const resetUserPassword = async (query: ParsedQs, input: unknown)
 }
 
 const refreshAccessToken = async (refreshToken: string) => {
-  if (!refreshToken || typeof refreshToken !== "string")
-    throw new BadRequestError("Token is missing")
-
   const { userId } = verifyRefreshToken(refreshToken)
   const user = await User.findById(userId).select("+refreshToken")
   if (!user || !user.refreshToken)

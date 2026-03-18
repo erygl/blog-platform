@@ -21,10 +21,10 @@ describe("POST api/auth/refresh", () => {
     expect(res.body).toHaveProperty("accessToken")
   })
 
-  it("should return 400 if refresh token cookie is missing", async () => {
+  it("should return 401 if refresh token cookie is missing", async () => {
     const res = await request(app)
       .post("/api/auth/refresh")
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(401)
   })
 
   it("should return 401 if refresh token is invalid", async () => {

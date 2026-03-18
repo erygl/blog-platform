@@ -1,20 +1,23 @@
 import User from "../models/User.js"
-import * as userValidation from "../validations/user.validation.js"
 import { NotFoundError, UnauthorizedError, BadRequestError } from "../errors/index.js"
 import bcrypt from "bcryptjs"
 import { sendVerificationEmail } from "../utils/email.js"
 import { createVerificationToken } from "../utils/token.js"
 
-const updateProfile = async (userId: string, input: unknown) => {
-  const data = userValidation.updateProfileSchema.parse(input)
+const updateProfile = async (
+  userId: string,
+  data: { username?: string, bio?: string, avatar?: string }
+) => {
   const user = await User.findByIdAndUpdate(userId, data, { returnDocument: "after" })
   if (!user) throw new NotFoundError("User not found")
   return user
 }
 
-const updateEmail = async (userId: string, input: unknown): Promise<void> => {
-  const { email, password } = userValidation.updateEmailSchema.parse(input)
-
+const updateEmail = async (
+  userId: string,
+  email: string,
+  password: string
+): Promise<void> => {
   const user = await User.findById(userId).select("+password")
   if (!user) throw new NotFoundError("User not found")
 
@@ -32,9 +35,11 @@ const updateEmail = async (userId: string, input: unknown): Promise<void> => {
   await sendVerificationEmail(user.email, token)
 }
 
-const updatePassword = async (userId: string, input: unknown) => {
-  const { oldPassword, newPassword } = userValidation.updatePasswordSchema.parse(input)
-
+const updatePassword = async (
+  userId: string,
+  oldPassword: string,
+  newPassword: string
+) => {
   const user = await User.findById(userId).select("+password")
   if (!user) throw new NotFoundError("User not found")
 
