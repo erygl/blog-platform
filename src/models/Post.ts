@@ -7,10 +7,14 @@ interface IPost {
   coverImage: string | null,
   tags: Types.ObjectId[]
   status: "draft" | "published" | "archived"
+  excerpt: string,
   slug: string,
-  viewsCount: number,
   likes: Types.ObjectId[],
   comments: Types.ObjectId[],
+  viewsCount: number,
+  likesCount: number,
+  commentsCount: number,
+  trendingScore: number,
   publishedAt: Date | null
 }
 
@@ -50,14 +54,14 @@ const PostSchema = new Schema<IPost>({
     },
     default: "draft"
   },
+  excerpt: {
+    type: String,
+    required: true
+  },
   slug: {
     type: String,
     unique: true,
     required: true
-  },
-  viewsCount: {
-    type: Number,
-    default: 0
   },
   likes: {
     type: [{
@@ -66,12 +70,21 @@ const PostSchema = new Schema<IPost>({
     }],
     default: []
   },
-  comments: {
-    type: [{
-      type: Schema.Types.ObjectId,
-      ref: "Comment"
-    }],
-    default: []
+  viewsCount: {
+    type: Number,
+    default: 0
+  },
+  likesCount: {
+    type: Number,
+    default: 0
+  },
+  commentsCount: {
+    type: Number,
+    default: 0
+  },
+  trendingScore: {
+    type: Number,
+    default: 0
   },
   publishedAt: {
     type: Date,
