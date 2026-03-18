@@ -2,6 +2,7 @@ import Post from "../models/Post.js";
 import Tag from "../models/Tag.js";
 import User from "../models/User.js";
 import { generateSlug } from "../utils/slug.js";
+import { ForbiddenError, NotFoundError } from "../errors/index.js";
 
 const getTrendingPosts = async (page: number, limit: number) => {
   const skip = (page - 1) * limit
@@ -76,9 +77,85 @@ const getDrafts = async (userId: string) => {
   return drafts
 }
 
+const getSingleDraft = async (userId: string, postSlug: string) => {
+  const draft = await Post.findOne({
+    author: userId,
+    slug: postSlug,
+    status: "draft"
+  })
+    .select("-excerpt -likes -trendingScore")
+    .populate("author", "username avatar")
+    .populate("tags", "name slug")
+    .lean()
+
+  if (!draft) throw new NotFoundError("Draft not found")
+  return draft
+}
+
+const getSinglePost = async (postSlug: string) => {
+  const post = await Post.findOneAndUpdate(
+    { slug: postSlug, status: "published" },
+    { $inc: { viewsCount: 1 } },
+    { returnDocument: "after" }
+  )
+    .select("-status -excerpt -likes -trendingScore -createdAt -updatedAt")
+    .populate("author", "username avatar")
+    .populate("tags", "name slug")
+    .lean()
+
+  if (!post) throw new NotFoundError("Post not found")
+  return post
+}
+
+const updatePost = async (
+  data: {
+    title?: string,
+    content?: string,
+    status?: "draft" | "published",
+    coverImage?: string,
+    tags?: string[]
+  },
+  postSlug: string,
+  userId: string
+) => {
+  const post = await Post.findOne({ slug: postSlug }).lean()
+  if (!post || post.author.toString() !== userId)
+    throw new NotFoundError("Post not found")
+
+  let tagIds;
+  if (data.tags) {
+    tagIds = await Promise.all(
+      (data.tags ?? []).map(async (name) => {
+        const tagSlug = generateSlug(name)
+        const tag = await Tag.findOneAndUpdate(
+          { name },
+          { $setOnInsert: { name, slug: tagSlug } },
+          { upsert: true, returnDocument: "after" }
+        )
+        return tag._id
+      })
+    )
+  }
+
+  const updatedPost = await Post.findOneAndUpdate(
+    { slug: postSlug },
+    {
+      ...data,
+      excerpt: data.content ? data.content.slice(0, 100).trimEnd() : post.excerpt,
+      tags: tagIds ?? post.tags,
+      publishedAt: !post.publishedAt && data.status === "published" ? new Date() : post.publishedAt
+    },
+    { returnDocument: "after" }
+  )
+  return updatedPost
+}
+
 export {
   getTrendingPosts,
   createPost,
   getFeed,
-  getDrafts
+  getDrafts,
+  getSingleDraft,
+  getSinglePost,
+  updatePost
 }

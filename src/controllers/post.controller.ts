@@ -30,13 +30,40 @@ const getFeed = async (req: Request, res: Response) => {
 const getDrafts = async (req: Request, res: Response) => {
   const userId = req.user!.userId
   const drafts = await postService.getDrafts(userId)
-  
+
   res.status(200).json({ drafts })
+}
+
+const getSingleDraft = async (req: Request, res: Response) => {
+  const userId = req.user!.userId
+  const postSlug = req.params.postSlug as string
+
+  const draft = await postService.getSingleDraft(userId, postSlug)
+  res.status(200).json({ draft })
+}
+
+const getSinglePost = async (req: Request, res: Response) => {
+  const postSlug = req.params.postSlug as string
+  const post = await postService.getSinglePost(postSlug)
+
+  res.status(200).json({ post })
+}
+
+const updatePost = async (req: Request, res: Response) => {
+  const data = postValidation.updatePostSchema.parse(req.body)
+  const postSlug = req.params.postSlug as string
+  const userId = req.user!.userId
+
+  const post = await postService.updatePost(data, postSlug, userId)
+  res.status(200).json({ post, message: "Post updated successfully" })
 }
 
 export {
   getTrendingPosts,
   createPost,
   getFeed,
-  getDrafts
+  getDrafts,
+  getSingleDraft,
+  getSinglePost,
+  updatePost
 }

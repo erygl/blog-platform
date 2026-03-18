@@ -10,7 +10,6 @@ interface IPost {
   excerpt: string,
   slug: string,
   likes: Types.ObjectId[],
-  comments: Types.ObjectId[],
   viewsCount: number,
   likesCount: number,
   commentsCount: number,
