@@ -1,5 +1,6 @@
 import Post from "../models/Post.js";
 import Tag from "../models/Tag.js";
+import User from "../models/User.js";
 import { generateSlug } from "../utils/slug.js";
 
 const getTrendingPosts = async (page: number, limit: number) => {
@@ -7,12 +8,13 @@ const getTrendingPosts = async (page: number, limit: number) => {
   const posts = await Post.find({ status: "published" })
     .sort({ trendingScore: -1 })
     .skip(skip)
-    .limit(limit)
+    .limit(limit + 1)
     .select("title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
     .populate("author", "username avatar")
     .lean()
 
-  return posts
+  const hasMore = posts.length > limit
+  return { posts: posts.slice(0, limit), hasMore }
 }
 
 const createPost = async (data: {
@@ -49,7 +51,34 @@ const createPost = async (data: {
   return post
 }
 
+const getFeed = async (userId: string, page: number, limit: number) => {
+  const skip = (page - 1) * limit
+  const currentUser = await User.findById(userId).select("following").lean()
+  const followedUsers = currentUser!.following
+  const posts = await Post.find({ author: followedUsers, status: "published" })
+    .sort("-publishedAt")
+    .skip(skip)
+    .limit(limit + 1)
+    .select("title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
+    .populate("author", "username avatar")
+    .lean()
+
+  const hasMore = posts.length > limit
+  return { posts: posts.slice(0, limit), hasMore }
+}
+
+const getDrafts = async (userId: string) => {
+  const drafts = await Post.find({ author: userId, status: "draft" })
+    .sort("-createdAt")
+    .select("title slug excerpt updatedAt")
+    .lean()
+
+  return drafts
+}
+
 export {
   getTrendingPosts,
-  createPost
+  createPost,
+  getFeed,
+  getDrafts
 }
