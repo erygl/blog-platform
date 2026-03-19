@@ -105,3 +105,53 @@ describe("DELETE /api/posts/:postSlug/like", () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe("GET /api/posts/:postSlug/likes", () => {
+  it("should return 200 with likes array and hasMore flag", async () => {
+    await request(app)
+      .post(`/api/posts/${postSlug}/like`)
+      .set("Authorization", `Bearer ${readerToken}`)
+
+    const res = await request(app).get(`/api/posts/${postSlug}/likes`)
+    expect(res.status).toBe(200)
+    expect(res.body.likes).toHaveLength(1)
+    expect(res.body.likes[0].username).toBe("jane")
+    expect(res.body.hasMore).toBe(false)
+    expect(res.body.total).toBe(1)
+  })
+
+  it("should return empty array when no likes exist", async () => {
+    const res = await request(app).get(`/api/posts/${postSlug}/likes`)
+    expect(res.status).toBe(200)
+    expect(res.body.likes).toHaveLength(0)
+    expect(res.body.hasMore).toBe(false)
+  })
+
+  it("should respect limit and return hasMore", async () => {
+    await request(app).post("/api/auth/register").send({
+      username: "bob",
+      email: "bob@example.com",
+      password: "Password1"
+    })
+    const bobLogin = await request(app).post("/api/auth/login").send({
+      email: "bob@example.com",
+      password: "Password1"
+    })
+    await request(app)
+      .post(`/api/posts/${postSlug}/like`)
+      .set("Authorization", `Bearer ${readerToken}`)
+    await request(app)
+      .post(`/api/posts/${postSlug}/like`)
+      .set("Authorization", `Bearer ${bobLogin.body.accessToken}`)
+
+    const res = await request(app).get(`/api/posts/${postSlug}/likes?limit=1`)
+    expect(res.status).toBe(200)
+    expect(res.body.likes).toHaveLength(1)
+    expect(res.body.hasMore).toBe(true)
+  })
+
+  it("should return 404 for non-existent post", async () => {
+    const res = await request(app).get("/api/posts/non-existent-slug/likes")
+    expect(res.status).toBe(404)
+  })
+})
