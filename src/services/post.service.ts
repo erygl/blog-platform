@@ -11,8 +11,8 @@ const getTrendingPosts = async (page: number, limit: number) => {
     .sort({ trendingScore: -1 })
     .skip(skip)
     .limit(limit + 1)
-    .select("title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
-    .populate("author", "username avatar")
+    .select("-_id title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
+    .populate("author", "-_id username avatar")
     .lean()
 
   const hasMore = posts.length > limit
@@ -61,8 +61,8 @@ const getFeed = async (userId: string, page: number, limit: number) => {
     .sort("-publishedAt")
     .skip(skip)
     .limit(limit + 1)
-    .select("title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
-    .populate("author", "username avatar")
+    .select("-_id title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
+    .populate("author", "-_id username avatar")
     .lean()
 
   const hasMore = posts.length > limit
@@ -85,8 +85,8 @@ const getSingleDraft = async (userId: string, postSlug: string) => {
     status: "draft"
   })
     .select("-excerpt -likes -trendingScore")
-    .populate("author", "username avatar")
-    .populate("tags", "name slug")
+    .populate("author", "-_id username avatar")
+    .populate("tags", "-_id name slug")
     .lean()
 
   if (!draft) throw new NotFoundError("Draft not found")
@@ -99,9 +99,9 @@ const getSinglePost = async (postSlug: string) => {
     { $inc: { viewsCount: 1 } },
     { returnDocument: "after" }
   )
-    .select("-status -excerpt -likes -trendingScore -createdAt -updatedAt")
-    .populate("author", "username avatar")
-    .populate("tags", "name slug")
+    .select("-_id -status -excerpt -likes -trendingScore -createdAt -updatedAt")
+    .populate("author", "-_id username avatar")
+    .populate("tags", "-_id name slug")
     .lean()
 
   if (!post) throw new NotFoundError("Post not found")
@@ -186,6 +186,20 @@ const unLikePost = async (postSlug: string, userId: string): Promise<void> => {
   )
 }
 
+const getPostLikes = async (postSlug: string, page: number, limit: number) => {
+  const skip = (page - 1) * limit
+  const post = await Post.findOne({ slug: postSlug, status: "published" })
+    .select("likes likesCount")
+    .slice("likes", [skip, limit + 1])
+    .populate("likes", "-_id username avatar bio")
+    .lean()
+
+  if (!post) throw new NotFoundError("Post not found")
+
+  const hasMore = post.likes.length > limit
+  return { likes: post.likes.slice(0, limit), hasMore, total: post.likesCount }
+}
+
 export {
   getTrendingPosts,
   createPost,
@@ -196,5 +210,6 @@ export {
   updatePost,
   deletePost,
   likePost,
-  unLikePost
+  unLikePost,
+  getPostLikes
 }

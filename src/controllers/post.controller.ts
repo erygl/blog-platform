@@ -83,6 +83,15 @@ const unLikePost = async (req: Request, res: Response) => {
   res.status(200).json({ message: "Post unliked successfully" })
 }
 
+const getPostLikes = async (req: Request, res: Response) => {
+  const postSlug = req.params.postSlug as string
+  const page = Number(req.query.page) || 1
+  const limit = Number(req.query.limit) || 10
+  const { likes, hasMore } = await postService.getPostLikes(postSlug, page, limit)
+
+  res.status(200).json({ likes, hasMore })
+}
+
 export {
   getTrendingPosts,
   createPost,
@@ -93,5 +102,6 @@ export {
   updatePost,
   deletePost,
   likePost,
-  unLikePost
+  unLikePost,
+  getPostLikes
 }

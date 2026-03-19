@@ -10,7 +10,8 @@ import {
   updatePost,
   deletePost,
   likePost,
-  unLikePost
+  unLikePost,
+  getPostLikes
 } from "../controllers/post.controller.js"
 
 const router = Router()
@@ -27,5 +28,6 @@ router.route("/:postSlug")
 router.route("/:postSlug/like")
   .post(authMiddleware, likePost)
   .delete(authMiddleware, unLikePost)
+router.route("/:postSlug/likes").get(getPostLikes)
 
 export default router
