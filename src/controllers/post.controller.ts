@@ -87,9 +87,9 @@ const getPostLikes = async (req: Request, res: Response) => {
   const postSlug = req.params.postSlug as string
   const page = Number(req.query.page) || 1
   const limit = Number(req.query.limit) || 10
-  const { likes, hasMore } = await postService.getPostLikes(postSlug, page, limit)
+  const { likes, hasMore, total } = await postService.getPostLikes(postSlug, page, limit)
 
-  res.status(200).json({ likes, hasMore })
+  res.status(200).json({ likes, hasMore, total })
 }
 
 export {
