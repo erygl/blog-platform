@@ -159,7 +159,8 @@ const deletePost = async (postSlug: string, userId: string): Promise<void> => {
 }
 
 const likePost = async (postSlug: string, userId: string): Promise<void> => {
-  const post = await Post.findOne({ slug: postSlug }).select("likes").lean()
+  const post = await Post.findOne({ slug: postSlug, status: "published" })
+    .select("likes").lean()
   if (!post) throw new NotFoundError("Post not found")
 
   const isAlreadyLikedByUser = post.likes.some(id => id.toString() === userId)
@@ -172,7 +173,8 @@ const likePost = async (postSlug: string, userId: string): Promise<void> => {
 }
 
 const unLikePost = async (postSlug: string, userId: string): Promise<void> => {
-  const post = await Post.findOne({ slug: postSlug }).select("likes").lean()
+  const post = await Post.findOne({ slug: postSlug, status: "published" })
+    .select("likes").lean()
   if (!post) throw new NotFoundError("Post not found")
 
   const isLikedBefore = post.likes.some((id) => id.toString() === userId)
