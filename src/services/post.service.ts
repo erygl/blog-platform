@@ -1,8 +1,9 @@
 import Post from "../models/Post.js";
 import Tag from "../models/Tag.js";
 import User from "../models/User.js";
+import Comment from "../models/Comment.js";
 import { generateSlug } from "../utils/slug.js";
-import { ForbiddenError, NotFoundError } from "../errors/index.js";
+import { BadRequestError, ConflictError, NotFoundError } from "../errors/index.js";
 
 const getTrendingPosts = async (page: number, limit: number) => {
   const skip = (page - 1) * limit
@@ -150,6 +151,39 @@ const updatePost = async (
   return updatedPost
 }
 
+const deletePost = async (postSlug: string, userId: string): Promise<void> => {
+  const post = await Post.findOneAndDelete({ slug: postSlug, author: userId })
+  if (!post) throw new NotFoundError("Post not found")
+
+  await Comment.deleteMany({ post: post._id })
+}
+
+const likePost = async (postSlug: string, userId: string): Promise<void> => {
+  const post = await Post.findOne({ slug: postSlug }).select("likes").lean()
+  if (!post) throw new NotFoundError("Post not found")
+
+  const isAlreadyLikedByUser = post.likes.some(id => id.toString() === userId)
+  if (isAlreadyLikedByUser) throw new ConflictError("Post already liked")
+
+  await Post.findOneAndUpdate(
+    { slug: postSlug },
+    { $addToSet: { likes: userId }, $inc: { likesCount: 1 } }
+  )
+}
+
+const unLikePost = async (postSlug: string, userId: string): Promise<void> => {
+  const post = await Post.findOne({ slug: postSlug }).select("likes").lean()
+  if (!post) throw new NotFoundError("Post not found")
+
+  const isLikedBefore = post.likes.some((id) => id.toString() === userId)
+  if (!isLikedBefore) throw new BadRequestError("Post not liked")
+
+  await Post.findOneAndUpdate(
+    { slug: postSlug },
+    { $pull: { likes: userId }, $inc: { likesCount: -1 } }
+  )
+}
+
 export {
   getTrendingPosts,
   createPost,
@@ -157,5 +191,8 @@ export {
   getDrafts,
   getSingleDraft,
   getSinglePost,
-  updatePost
+  updatePost,
+  deletePost,
+  likePost,
+  unLikePost
 }

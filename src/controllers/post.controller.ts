@@ -58,6 +58,31 @@ const updatePost = async (req: Request, res: Response) => {
   res.status(200).json({ post, message: "Post updated successfully" })
 }
 
+const deletePost = async (req: Request, res: Response) => {
+  const postSlug = req.params.postSlug as string
+  const userId = req.user!.userId
+
+  await postService.deletePost(postSlug, userId)
+  res.status(204).send()
+}
+
+const likePost = async (req: Request, res: Response) => {
+  const postSlug = req.params.postSlug as string
+  const userId = req.user!.userId
+  await postService.likePost(postSlug, userId)
+
+  res.status(200).json({ message: "Post liked successfully" })
+}
+
+const unLikePost = async (req: Request, res: Response) => {
+  const postSlug = req.params.postSlug as string
+  const userId = req.user!.userId
+
+  await postService.unLikePost(postSlug, userId)
+
+  res.status(200).json({ message: "Post unliked successfully" })
+}
+
 export {
   getTrendingPosts,
   createPost,
@@ -65,5 +90,8 @@ export {
   getDrafts,
   getSingleDraft,
   getSinglePost,
-  updatePost
+  updatePost,
+  deletePost,
+  likePost,
+  unLikePost
 }
