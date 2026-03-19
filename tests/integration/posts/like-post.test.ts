@@ -7,12 +7,14 @@ vi.mock("../../../src/utils/email.js", () => ({
 }))
 
 let postSlug: string
+let authorToken: string
 let readerToken: string
 
 beforeEach(async () => {
   await registerUser()
   const authorRes = await loginUser()
-  const post = await createPost(authorRes.accessToken)
+  authorToken = authorRes.accessToken
+  const post = await createPost(authorToken)
   postSlug = post.slug
 
   await request(app).post("/api/auth/register").send({
@@ -54,6 +56,14 @@ describe("POST /api/posts/:postSlug/like", () => {
   it("should return 404 if post does not exist", async () => {
     const res = await request(app)
       .post("/api/posts/non-existent-slug/like")
+      .set("Authorization", `Bearer ${readerToken}`)
+    expect(res.status).toBe(404)
+  })
+
+  it("should return 404 when trying to like a draft", async () => {
+    const draft = await createPost(authorToken, { status: "draft" })
+    const res = await request(app)
+      .post(`/api/posts/${draft.slug}/like`)
       .set("Authorization", `Bearer ${readerToken}`)
     expect(res.status).toBe(404)
   })
