@@ -10,6 +10,8 @@ interface IUser {
   isVerified: boolean,
   followers: Types.ObjectId[],
   following: Types.ObjectId[],
+  followersCount: number,
+  followingCount: number,
   refreshToken: string | null,
   passwordResetToken: string | null,
   passwordResetTokenExpiry: Date | null
@@ -69,6 +71,14 @@ const userSchema = new Schema<IUser>({
       ref: "User"
     }],
     default: []
+  },
+  followersCount: {
+    type: Number,
+    default: 0
+  },
+  followingCount: {
+    type: Number,
+    default: 0
   },
   refreshToken: {
     type: String,

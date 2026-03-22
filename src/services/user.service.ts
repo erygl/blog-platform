@@ -1,8 +1,19 @@
 import User from "../models/User.js"
+import Post from "../models/Post.js"
+import Comment from "../models/Comment.js"
 import { NotFoundError, UnauthorizedError, BadRequestError } from "../errors/index.js"
 import bcrypt from "bcryptjs"
 import { sendVerificationEmail } from "../utils/email.js"
 import { createVerificationToken } from "../utils/token.js"
+
+const getMyProfile = async (userId: string) => {
+  const user = await User.findById(userId)
+    .select("-_id -followers -following")
+    .lean()
+  if (!user) throw new NotFoundError("User not found")
+
+  return user
+}
 
 const updateProfile = async (
   userId: string,
@@ -11,6 +22,68 @@ const updateProfile = async (
   const user = await User.findByIdAndUpdate(userId, data, { returnDocument: "after" })
   if (!user) throw new NotFoundError("User not found")
   return user
+}
+
+const deleteMyProfile = async (userId: string) => {
+  const user = await User.findById(userId)
+  if (!user) throw new NotFoundError("User not found")
+
+  const posts = await Post.find({ author: userId }).select("_id").lean()
+  const postIds = posts.map(p => p._id)
+
+  // delete comments on all of the user's own posts
+  await Comment.deleteMany({ post: { $in: postIds } })
+
+  // delete user's posts
+  await Post.deleteMany({ _id: { $in: postIds } })
+
+  // remove user from likes list on all posts and decrease likeCount
+  await Post.updateMany({ likes: userId },
+    { $pull: { likes: userId }, $inc: { likesCount: -1 } }
+  )
+
+  // decrease commentsCount on all posts that user previously replied
+  const comments = await Comment.find({ author: userId, post: { $nin: postIds } })
+    .select("post")
+    .lean()
+
+  const countPerPost = comments.reduce((acc, comment) => {
+    const postId = comment.post.toString()
+    acc[postId] = (acc[postId] ?? 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  if (Object.keys(countPerPost).length > 0) {
+    await Post.bulkWrite(
+      Object.entries(countPerPost).map(([postId, count]) => ({
+        updateOne: {
+          filter: { _id: postId },
+          update: { $inc: { commentsCount: -count } }
+        }
+      }))
+    )
+  }
+
+  // delete all comments that belongs to user
+  await Comment.deleteMany({ author: userId })
+
+  // remove user from likes list on all comments and decrease likeCount
+  await Comment.updateMany({ likes: userId },
+    { $pull: { likes: userId }, $inc: { likesCount: -1 } }
+  )
+
+  // remove user from followers list on all users and decrease followersCount
+  await User.updateMany({ followers: userId },
+    { $pull: { followers: userId }, $inc: { followersCount: -1 } }
+  )
+
+  // remove user from following list on all users and decrease followingCount
+  await User.updateMany({ following: userId },
+    { $pull: { following: userId }, $inc: { followingCount: -1 } }
+  )
+
+  // delete user in the end
+  await user.deleteOne()
 }
 
 const updateEmail = async (
@@ -57,7 +130,9 @@ const updatePassword = async (
 
 
 export {
+  getMyProfile,
   updateProfile,
+  deleteMyProfile,
   updateEmail,
   updatePassword
 }

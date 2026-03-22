@@ -2,6 +2,12 @@ import type { Request, Response } from "express";
 import * as userService from "../services/user.service.js"
 import * as userValidation from "../validations/user.validation.js"
 
+const getMyProfile = async (req: Request, res: Response) => {
+  const userId = req.user!.userId
+  const user = await userService.getMyProfile(userId)
+  res.status(200).json({ user })
+}
+
 const updateProfile = async (req: Request, res: Response) => {
   const data = userValidation.updateProfileSchema.parse(req.body)
   const userId = req.user!.userId
@@ -13,6 +19,12 @@ const updateProfile = async (req: Request, res: Response) => {
       avatar: user.avatar
     }
   })
+}
+
+const deleteMyProfile = async (req: Request, res: Response) => {
+  const userId = req.user!.userId
+  await userService.deleteMyProfile(userId)
+  res.status(204).send()
 }
 
 const updateEmail = async (req: Request, res: Response) => {
@@ -30,7 +42,9 @@ const updatePassword = async (req: Request, res: Response) => {
 }
 
 export {
+  getMyProfile,
   updateProfile,
+  deleteMyProfile,
   updateEmail,
   updatePassword
 }
