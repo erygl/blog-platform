@@ -95,7 +95,7 @@ const userSchema = new Schema<IUser>({
     select: false,
     default: null
   }
-}, { timestamps: true })
+}, { timestamps: true, versionKey: false })
 
 const User = model<IUser>("User", userSchema)
 

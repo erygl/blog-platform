@@ -8,11 +8,18 @@ import { createVerificationToken } from "../utils/token.js"
 
 const getMyProfile = async (userId: string) => {
   const user = await User.findById(userId)
-    .select("-_id -followers -following")
+    .select("-_id -followers -following -createdAt -updatedAt")
     .lean()
   if (!user) throw new NotFoundError("User not found")
 
-  return user
+  const totalPosts = await Post.countDocuments({ author: userId, status: "published" })
+
+  return {
+    user: {
+      ...user,
+      totalPosts
+    },
+  }
 }
 
 const updateProfile = async (
@@ -24,7 +31,7 @@ const updateProfile = async (
   return user
 }
 
-const deleteMyProfile = async (userId: string) => {
+const deleteMyProfile = async (userId: string): Promise<void> => {
   const user = await User.findById(userId)
   if (!user) throw new NotFoundError("User not found")
 
@@ -86,6 +93,19 @@ const deleteMyProfile = async (userId: string) => {
   await user.deleteOne()
 }
 
+const getLikedPosts = async (userId: string, page: number, limit: number) => {
+  const skip = (page - 1) * limit
+  const posts = await Post.find({ likes: userId, status: "published" })
+    .skip(skip)
+    .limit(limit + 1)
+    .select("-_id title author coverImage excerpt slug likesCount commentsCount publishedAt")
+    .populate("author", "-_id username avatar")
+    .lean()
+
+  const hasMore = posts.length > limit
+  return { posts: posts.slice(0, limit), hasMore }
+}
+
 const updateEmail = async (
   userId: string,
   email: string,
@@ -112,7 +132,7 @@ const updatePassword = async (
   userId: string,
   oldPassword: string,
   newPassword: string
-) => {
+): Promise<void> => {
   const user = await User.findById(userId).select("+password")
   if (!user) throw new NotFoundError("User not found")
 
@@ -128,11 +148,43 @@ const updatePassword = async (
   await user.save()
 }
 
+const getPublicProfile = async (username: string) => {
+  const user = await User.findOne({ username: username })
+    .select("-_id username avatar bio followersCount followingCount")
+    .lean()
+  if (!user) throw new NotFoundError("User not found")
+  return user
+}
+
+const getPostsByUsername = async (
+  username: string,
+  page: number,
+  limit: number
+) => {
+  const skip = (page - 1) * limit
+  const user = await User.findOne({ username: username }).select("_id").lean()
+  if (!user) throw new NotFoundError("User not found")
+
+  const posts = await Post.find({ author: user._id, status: "published" })
+    .sort("-publishedAt")
+    .skip(skip)
+    .limit(limit)
+    .select("-_id title coverImage excerpt slug likesCount commentsCount publishedAt")
+    .lean()
+
+
+  const total = await Post.countDocuments({ author: user._id, status: "published" })
+  const hasMore = total > page * limit
+  return { posts, hasMore, total }
+}
 
 export {
   getMyProfile,
   updateProfile,
   deleteMyProfile,
+  getLikedPosts,
   updateEmail,
-  updatePassword
+  updatePassword,
+  getPublicProfile,
+  getPostsByUsername
 }

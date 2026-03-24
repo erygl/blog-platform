@@ -27,6 +27,14 @@ const deleteMyProfile = async (req: Request, res: Response) => {
   res.status(204).send()
 }
 
+const getLikedPosts = async (req: Request, res: Response) => {
+  const userId = req.user!.userId
+  const page = Number(req.query.page) || 1
+  const limit = Number(req.query.limit) || 10
+  const { posts, hasMore } = await userService.getLikedPosts(userId, page, limit)
+  res.status(200).json({ posts, hasMore })
+}
+
 const updateEmail = async (req: Request, res: Response) => {
   const { email, password } = userValidation.updateEmailSchema.parse(req.body)
   const userId = req.user!.userId
@@ -41,10 +49,27 @@ const updatePassword = async (req: Request, res: Response) => {
   res.status(200).json({ message: "Password changed successfully" })
 }
 
+const getPublicProfile = async (req: Request, res: Response) => {
+  const username = req.params.username as string
+  const user = await userService.getPublicProfile(username)
+  res.status(200).json({ user })
+}
+
+const getPostsByUsername = async (req: Request, res: Response) => {
+  const username = req.params.username as string
+  const page = Number(req.query.page) || 1
+  const limit = Number(req.query.limit) || 10
+  const { posts, hasMore, total } = await userService.getPostsByUsername(username, page, limit)
+  res.status(200).json({ posts, hasMore, total })
+}
+
 export {
   getMyProfile,
   updateProfile,
   deleteMyProfile,
+  getLikedPosts,
   updateEmail,
-  updatePassword
+  updatePassword,
+  getPublicProfile,
+  getPostsByUsername
 }
