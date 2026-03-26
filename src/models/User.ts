@@ -8,8 +8,6 @@ interface IUser {
   bio: string,
   role: "user" | "admin",
   isVerified: boolean,
-  followers: Types.ObjectId[],
-  following: Types.ObjectId[],
   followersCount: number,
   followingCount: number,
   refreshToken: string | null,
@@ -57,20 +55,6 @@ const userSchema = new Schema<IUser>({
   isVerified: {
     type: Boolean,
     default: false
-  },
-  followers: {
-    type: [{
-      type: Schema.Types.ObjectId,
-      ref: "User"
-    }],
-    default: []
-  },
-  following: {
-    type: [{
-      type: Schema.Types.ObjectId,
-      ref: "User"
-    }],
-    default: []
   },
   followersCount: {
     type: Number,

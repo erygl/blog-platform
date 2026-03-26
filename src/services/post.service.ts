@@ -6,6 +6,7 @@ import { generateSlug } from "../utils/slug.js";
 import { BadRequestError, ConflictError, NotFoundError } from "../errors/index.js";
 import Like from "../models/Like.js";
 import { mongo } from "mongoose";
+import Follow from "../models/Follow.js";
 
 const getTrendingPosts = async (page: number, limit: number) => {
   const skip = (page - 1) * limit
@@ -57,8 +58,7 @@ const createPost = async (data: {
 
 const getFeed = async (userId: string, page: number, limit: number) => {
   const skip = (page - 1) * limit
-  const currentUser = await User.findById(userId).select("following").lean()
-  const followedUsers = currentUser!.following
+  const followedUsers = await Follow.find({ follower: userId })
   const posts = await Post.find({ author: followedUsers, status: "published" })
     .sort("-publishedAt")
     .skip(skip)

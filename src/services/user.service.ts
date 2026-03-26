@@ -7,10 +7,11 @@ import { sendVerificationEmail } from "../utils/email.js"
 import { createVerificationToken } from "../utils/token.js"
 import Like from "../models/Like.js"
 import { Types } from "mongoose"
+import Follow from "../models/Follow.js"
 
 const getMyProfile = async (userId: string) => {
   const user = await User.findById(userId)
-    .select("-_id -followers -following -createdAt -updatedAt")
+    .select("-_id -createdAt -updatedAt")
     .lean()
   if (!user) throw new NotFoundError("User not found")
 
@@ -53,7 +54,6 @@ const deleteMyProfile = async (userId: string): Promise<void> => {
   const likedPosts = await Like.find({ user: userId, post: { $nin: postIds } })
     .select("post")
     .lean()
-
   const likedPostIds = likedPosts.map(l => l.post)
   await Post.updateMany({ _id: { $in: likedPostIds } }, { $inc: { likesCount: -1 } })
 
@@ -61,7 +61,6 @@ const deleteMyProfile = async (userId: string): Promise<void> => {
   const likedComments = await Like.find({ user: userId, type: "comment" })
     .select("comment")
     .lean()
-
   const likedCommentIds = likedComments.map(l => l.comment)
   await Comment.updateMany({ _id: { $in: likedCommentIds } }, { $inc: { likesCount: -1 } })
 
@@ -72,13 +71,11 @@ const deleteMyProfile = async (userId: string): Promise<void> => {
   const comments = await Comment.find({ author: userId, post: { $nin: postIds } })
     .select("post")
     .lean()
-
   const countPerPost = comments.reduce((acc, comment) => {
     const postId = comment.post.toString()
     acc[postId] = (acc[postId] ?? 0) + 1
     return acc
   }, {} as Record<string, number>)
-
   if (Object.keys(countPerPost).length > 0) {
     await Post.bulkWrite(
       Object.entries(countPerPost).map(([postId, count]) => ({
@@ -93,15 +90,25 @@ const deleteMyProfile = async (userId: string): Promise<void> => {
   // delete all comments that belongs to user
   await Comment.deleteMany({ author: userId })
 
-  // remove user from followers list on all users and decrease followersCount
-  await User.updateMany({ followers: userId },
-    { $pull: { followers: userId }, $inc: { followersCount: -1 } }
-  )
+  // decrement followingCount for all users who followed the deleted user
+  const followers = await Follow.find({ following: userId })
+    .select("follower")
+    .lean()
+  const followerIds = followers.map(f => f.follower)
+  await User.updateMany({ _id: { $in: followerIds } }, { $inc: { followingCount: -1 } })
 
-  // remove user from following list on all users and decrease followingCount
-  await User.updateMany({ following: userId },
-    { $pull: { following: userId }, $inc: { followingCount: -1 } }
-  )
+  // remove all followers of the deleted user
+  await Follow.deleteMany({ following: userId })
+
+  // decrement followersCount for all users who are followed by the deleted user                                              
+  const following = await Follow.find({ follower: userId })
+    .select("following")
+    .lean()
+  const followingIds = following.map(f => f.following)
+  await User.updateMany({ _id: { $in: followingIds } }, { $inc: { followersCount: -1 } })
+
+  // remove all following relationships of the deleted user
+  await Follow.deleteMany({ follower: userId })
 
   // delete user in the end
   await user.deleteOne()
