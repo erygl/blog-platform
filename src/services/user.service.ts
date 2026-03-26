@@ -5,6 +5,8 @@ import { NotFoundError, UnauthorizedError, BadRequestError } from "../errors/ind
 import bcrypt from "bcryptjs"
 import { sendVerificationEmail } from "../utils/email.js"
 import { createVerificationToken } from "../utils/token.js"
+import Like from "../models/Like.js"
+import { Types } from "mongoose"
 
 const getMyProfile = async (userId: string) => {
   const user = await User.findById(userId)
@@ -38,16 +40,33 @@ const deleteMyProfile = async (userId: string): Promise<void> => {
   const posts = await Post.find({ author: userId }).select("_id").lean()
   const postIds = posts.map(p => p._id)
 
-  // delete comments on all of the user's own posts
-  await Comment.deleteMany({ post: { $in: postIds } })
+  // delete comments and likes on all of the user's own posts
+  await Promise.all([
+    Comment.deleteMany({ post: { $in: postIds } }),
+    Like.deleteMany({ post: { $in: postIds } })
+  ])
 
   // delete user's posts
   await Post.deleteMany({ _id: { $in: postIds } })
 
-  // remove user from likes list on all posts and decrease likeCount
-  await Post.updateMany({ likes: userId },
-    { $pull: { likes: userId }, $inc: { likesCount: -1 } }
-  )
+  // decrease likesCount on all posts that user previously liked
+  const likedPosts = await Like.find({ user: userId, post: { $nin: postIds } })
+    .select("post")
+    .lean()
+
+  const likedPostIds = likedPosts.map(l => l.post)
+  await Post.updateMany({ _id: { $in: likedPostIds } }, { $inc: { likesCount: -1 } })
+
+  // decrease likesCount on all comments that user previously liked
+  const likedComments = await Like.find({ user: userId, type: "comment" })
+    .select("comment")
+    .lean()
+
+  const likedCommentIds = likedComments.map(l => l.comment)
+  await Comment.updateMany({ _id: { $in: likedCommentIds } }, { $inc: { likesCount: -1 } })
+
+  // remove all likes that belongs to user 
+  await Like.deleteMany({ user: userId })
 
   // decrease commentsCount on all posts that user previously replied
   const comments = await Comment.find({ author: userId, post: { $nin: postIds } })
@@ -74,11 +93,6 @@ const deleteMyProfile = async (userId: string): Promise<void> => {
   // delete all comments that belongs to user
   await Comment.deleteMany({ author: userId })
 
-  // remove user from likes list on all comments and decrease likeCount
-  await Comment.updateMany({ likes: userId },
-    { $pull: { likes: userId }, $inc: { likesCount: -1 } }
-  )
-
   // remove user from followers list on all users and decrease followersCount
   await User.updateMany({ followers: userId },
     { $pull: { followers: userId }, $inc: { followersCount: -1 } }
@@ -95,15 +109,33 @@ const deleteMyProfile = async (userId: string): Promise<void> => {
 
 const getLikedPosts = async (userId: string, page: number, limit: number) => {
   const skip = (page - 1) * limit
-  const posts = await Post.find({ likes: userId, status: "published" })
+  const likes = await Like.find({ user: userId, type: "post" })
+    .sort("-createdAt")
     .skip(skip)
     .limit(limit + 1)
-    .select("-_id title author coverImage excerpt slug likesCount commentsCount publishedAt")
+    .select("post")
+    .lean()
+
+  const hasMore = likes.length > limit
+  const slicedPostIds = likes
+    .slice(0, limit)
+    .map(l => l.post)
+    .filter((id): id is Types.ObjectId => id != null)
+
+  const postsData = await Post.find({ _id: { $in: slicedPostIds }, status: "published" })
+    .select("title author coverImage excerpt slug likesCount commentsCount publishedAt")
     .populate("author", "-_id username avatar")
     .lean()
 
-  const hasMore = posts.length > limit
-  return { posts: posts.slice(0, limit), hasMore }
+  const posts = slicedPostIds.map(id => {
+    const post = postsData
+      .find(post => post._id.toString() === id.toString())
+    if (!post) return null
+    const { _id, ...rest } = post
+    return rest
+  }).filter(Boolean)
+
+  return { posts, hasMore }
 }
 
 const updateEmail = async (

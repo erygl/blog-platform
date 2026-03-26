@@ -9,7 +9,6 @@ interface IPost {
   status: "draft" | "published" | "archived"
   excerpt: string,
   slug: string,
-  likes: Types.ObjectId[],
   viewsCount: number,
   likesCount: number,
   commentsCount: number,
@@ -61,13 +60,6 @@ const PostSchema = new Schema<IPost>({
     type: String,
     unique: true,
     required: true
-  },
-  likes: {
-    type: [{
-      type: Schema.Types.ObjectId,
-      ref: "User"
-    }],
-    default: []
   },
   viewsCount: {
     type: Number,

@@ -4,6 +4,8 @@ import User from "../models/User.js";
 import Comment from "../models/Comment.js";
 import { generateSlug } from "../utils/slug.js";
 import { BadRequestError, ConflictError, NotFoundError } from "../errors/index.js";
+import Like from "../models/Like.js";
+import { mongo } from "mongoose";
 
 const getTrendingPosts = async (page: number, limit: number) => {
   const skip = (page - 1) * limit
@@ -84,7 +86,7 @@ const getSingleDraft = async (userId: string, postSlug: string) => {
     slug: postSlug,
     status: "draft"
   })
-    .select("-excerpt -likes -trendingScore")
+    .select("-excerpt -trendingScore")
     .populate("author", "-_id username avatar")
     .populate("tags", "-_id name slug")
     .lean()
@@ -99,7 +101,7 @@ const getSinglePost = async (postSlug: string) => {
     { $inc: { viewsCount: 1 } },
     { returnDocument: "after" }
   )
-    .select("-_id -status -excerpt -likes -trendingScore -createdAt -updatedAt")
+    .select("-_id -status -excerpt -trendingScore -createdAt -updatedAt")
     .populate("author", "-_id username avatar")
     .populate("tags", "-_id name slug")
     .lean()
@@ -154,50 +156,55 @@ const updatePost = async (
 const deletePost = async (postSlug: string, userId: string): Promise<void> => {
   const post = await Post.findOneAndDelete({ slug: postSlug, author: userId })
   if (!post) throw new NotFoundError("Post not found")
-
-  await Comment.deleteMany({ post: post._id })
+  await Promise.all([
+    Like.deleteMany({ post: post._id }),
+    Comment.deleteMany({ post: post._id })
+  ])
 }
 
 const likePost = async (postSlug: string, userId: string): Promise<void> => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
-    .select("likes").lean()
+    .select("_id").lean()
   if (!post) throw new NotFoundError("Post not found")
 
-  const isAlreadyLikedByUser = post.likes.some(id => id.toString() === userId)
-  if (isAlreadyLikedByUser) throw new ConflictError("Post already liked")
-
-  await Post.findOneAndUpdate(
-    { slug: postSlug },
-    { $addToSet: { likes: userId }, $inc: { likesCount: 1 } }
-  )
+  try {
+    await Like.create({ user: userId, post: post._id, type: "post" })
+  } catch (error) {
+    if (error instanceof mongo.MongoServerError && error.code === 11000) {
+      throw new ConflictError("Post already liked")
+    }
+    throw error
+  }
+  await Post.findOneAndUpdate({ slug: postSlug }, { $inc: { likesCount: 1 } })
 }
 
 const unLikePost = async (postSlug: string, userId: string): Promise<void> => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
-    .select("likes").lean()
+    .select("_id").lean()
   if (!post) throw new NotFoundError("Post not found")
 
-  const isLikedBefore = post.likes.some((id) => id.toString() === userId)
-  if (!isLikedBefore) throw new BadRequestError("Post not liked")
-
-  await Post.findOneAndUpdate(
-    { slug: postSlug },
-    { $pull: { likes: userId }, $inc: { likesCount: -1 } }
-  )
+  const unlike = await Like.findOneAndDelete({ user: userId, post: post._id, type: "post" })
+  if (!unlike) throw new BadRequestError("Post not liked")
+  await Post.findOneAndUpdate({ slug: postSlug }, { $inc: { likesCount: -1 } })
 }
 
 const getPostLikes = async (postSlug: string, page: number, limit: number) => {
   const skip = (page - 1) * limit
   const post = await Post.findOne({ slug: postSlug, status: "published" })
-    .select("likes likesCount")
-    .slice("likes", [skip, limit + 1])
-    .populate("likes", "-_id username avatar bio")
+    .select("_id likesCount")
     .lean()
 
   if (!post) throw new NotFoundError("Post not found")
 
-  const hasMore = post.likes.length > limit
-  return { likes: post.likes.slice(0, limit), hasMore, total: post.likesCount }
+  const likes = await Like.find({ post: post._id })
+    .skip(skip)
+    .limit(limit)
+    .select("-_id user")
+    .populate("user", "-_id username avatar bio")
+    .lean()
+
+  const hasMore = (skip + limit) < post.likesCount
+  return { likes, hasMore, total: post.likesCount }
 }
 
 export {

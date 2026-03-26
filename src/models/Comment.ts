@@ -4,7 +4,7 @@ interface IComment {
   post: Types.ObjectId,
   author: Types.ObjectId,
   content: string,
-  likes: Types.ObjectId[],
+  likesCount: number,
   parentComment: Types.ObjectId | null
 }
 
@@ -23,12 +23,9 @@ const CommentSchema = new Schema<IComment>({
     type: String,
     required: true
   },
-  likes: {
-    type: [{
-      type: Schema.Types.ObjectId,
-      ref: "User"
-    }],
-    default: []
+  likesCount: {
+    type: Number,
+    default: 0
   },
   parentComment: {
     type: Schema.Types.ObjectId,
