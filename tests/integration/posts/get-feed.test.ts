@@ -2,6 +2,7 @@ import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
 import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 import User from "../../../src/models/User.js"
+import Follow from "../../../src/models/Follow.js"
 
 vi.mock("../../../src/utils/email.js", () => ({
   sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
@@ -49,7 +50,7 @@ describe("GET /api/posts/feed", () => {
 
     const john = await User.findOne({ username: "john" })
     const jane = await User.findOne({ username: "jane" })
-    await User.findByIdAndUpdate(john!._id, { $push: { following: jane!._id } })
+    await Follow.create({ follower: john!._id, following: jane!._id })
 
     const res = await request(app)
       .get("/api/posts/feed")
@@ -96,7 +97,7 @@ describe("GET /api/posts/feed", () => {
 
     const john = await User.findOne({ username: "john" })
     const jane = await User.findOne({ username: "jane" })
-    await User.findByIdAndUpdate(john!._id, { $push: { following: jane!._id } })
+    await Follow.create({ follower: john!._id, following: jane!._id })
 
     const res = await request(app)
       .get("/api/posts/feed?limit=2")
@@ -120,7 +121,7 @@ describe("GET /api/posts/feed", () => {
 
     const john = await User.findOne({ username: "john" })
     const jane = await User.findOne({ username: "jane" })
-    await User.findByIdAndUpdate(john!._id, { $push: { following: jane!._id } })
+    await Follow.create({ follower: john!._id, following: jane!._id })
 
     const res = await request(app)
       .get("/api/posts/feed")

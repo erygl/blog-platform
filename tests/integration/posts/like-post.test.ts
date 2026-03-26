@@ -115,7 +115,7 @@ describe("GET /api/posts/:postSlug/likes", () => {
     const res = await request(app).get(`/api/posts/${postSlug}/likes`)
     expect(res.status).toBe(200)
     expect(res.body.likes).toHaveLength(1)
-    expect(res.body.likes[0].username).toBe("jane")
+    expect(res.body.likes[0].user.username).toBe("jane")
     expect(res.body.hasMore).toBe(false)
     expect(res.body.total).toBe(1)
   })
