@@ -63,6 +63,36 @@ const getPostsByUsername = async (req: Request, res: Response) => {
   res.status(200).json({ posts, hasMore, total })
 }
 
+const followUser = async (req: Request, res: Response) => {
+  const userId = req.user!.userId
+  const username = req.params.username as string
+  await userService.followUser(userId, username)
+  res.status(200).json({ message: `${username} followed successfully` })
+}
+
+const unfollowUser = async (req: Request, res: Response) => {
+  const userId = req.user!.userId
+  const username = req.params.username as string
+  await userService.unfollowUser(userId, username)
+  res.status(200).json({ message: `${username} unfollowed successfully` })
+}
+
+const getFollowersList = async (req: Request, res: Response) => {
+  const username = req.params.username as string
+  const page = Number(req.query.page) || 1
+  const limit = Number(req.query.limit) || 10
+  const { followers, hasMore } = await userService.getFollowersList(username, page, limit)
+  res.status(200).json({ followers, hasMore })
+}
+
+const getFollowingList = async (req: Request, res: Response) => {
+  const username = req.params.username as string
+  const page = Number(req.query.page) || 1
+  const limit = Number(req.query.limit) || 10
+  const { following, hasMore } = await userService.getFollowingList(username, page, limit)
+  res.status(200).json({ following, hasMore })
+}
+
 export {
   getMyProfile,
   updateProfile,
@@ -71,5 +101,9 @@ export {
   updateEmail,
   updatePassword,
   getPublicProfile,
-  getPostsByUsername
+  getPostsByUsername,
+  followUser,
+  unfollowUser,
+  getFollowersList,
+  getFollowingList
 }

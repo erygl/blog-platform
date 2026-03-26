@@ -1,12 +1,12 @@
 import User from "../models/User.js"
 import Post from "../models/Post.js"
 import Comment from "../models/Comment.js"
-import { NotFoundError, UnauthorizedError, BadRequestError } from "../errors/index.js"
+import { NotFoundError, UnauthorizedError, BadRequestError, ConflictError } from "../errors/index.js"
 import bcrypt from "bcryptjs"
 import { sendVerificationEmail } from "../utils/email.js"
 import { createVerificationToken } from "../utils/token.js"
 import Like from "../models/Like.js"
-import { Types } from "mongoose"
+import { mongo, Types } from "mongoose"
 import Follow from "../models/Follow.js"
 
 const getMyProfile = async (userId: string) => {
@@ -217,6 +217,86 @@ const getPostsByUsername = async (
   return { posts, hasMore, total }
 }
 
+const followUser = async (userId: string, username: string): Promise<void> => {
+  const user = await User.findOne({ username: username })
+    .select("_id")
+    .lean()
+
+  if (!user) throw new NotFoundError("User not found")
+  if (user._id.toString() === userId)
+    throw new BadRequestError("Cannot follow yourself")
+
+  try {
+    await Follow.create({ follower: userId, following: user._id })
+  } catch (error) {
+    if (error instanceof mongo.MongoServerError && error.code === 11000) {
+      throw new ConflictError("Already following this user")
+    }
+    throw error
+  }
+  await Promise.all([
+    User.findByIdAndUpdate(userId, { $inc: { followingCount: 1 } }),
+    User.findByIdAndUpdate(user._id, { $inc: { followersCount: 1 } })
+  ])
+}
+
+const unfollowUser = async (userId: string, username: string): Promise<void> => {
+  const user = await User.findOne({ username: username })
+    .select("_id")
+    .lean()
+
+  if (!user) throw new NotFoundError("User not found")
+  if (user._id.toString() === userId)
+    throw new BadRequestError("Cannot unfollow yourself")
+
+  const unfollow = await Follow.findOneAndDelete(
+    { follower: userId, following: user._id }
+  )
+  if (!unfollow) throw new BadRequestError("You are not following this user")
+  await Promise.all([
+    User.findByIdAndUpdate(userId, { $inc: { followingCount: -1 } }),
+    User.findByIdAndUpdate(user._id, { $inc: { followersCount: -1 } })
+  ])
+}
+
+const getFollowersList = async (username: string, page: number, limit: number) => {
+  const skip = (page - 1) * limit
+  const user = await User.findOne({ username: username })
+    .select("_id")
+    .lean()
+  if (!user) throw new NotFoundError("User not found")
+
+  let followers = await Follow.find({ following: user._id })
+    .skip(skip)
+    .limit(limit + 1)
+    .select("-_id follower")
+    .populate("follower", "-_id username avatar")
+    .lean()
+
+  const hasMore = followers.length > limit
+  const sliced = followers.slice(0, limit).map(f => f.follower)
+  return { followers: sliced, hasMore }
+}
+
+const getFollowingList = async (username: string, page: number, limit: number) => {
+  const skip = (page - 1) * limit
+  const user = await User.findOne({ username: username })
+    .select("_id")
+    .lean()
+  if (!user) throw new NotFoundError("User not found")
+
+  const following = await Follow.find({ follower: user._id })
+    .skip(skip)
+    .limit(limit + 1)
+    .select("-_id following")
+    .populate("following", "-_id username avatar")
+    .lean()
+
+  const hasMore = following.length > limit
+  const sliced = following.slice(0, limit).map(f => f.following)
+  return { following: sliced, hasMore }
+}
+
 export {
   getMyProfile,
   updateProfile,
@@ -225,5 +305,9 @@ export {
   updateEmail,
   updatePassword,
   getPublicProfile,
-  getPostsByUsername
+  getPostsByUsername,
+  followUser,
+  unfollowUser,
+  getFollowersList,
+  getFollowingList
 }
