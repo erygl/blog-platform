@@ -58,8 +58,9 @@ const createPost = async (data: {
 
 const getFeed = async (userId: string, page: number, limit: number) => {
   const skip = (page - 1) * limit
-  const followedUsers = await Follow.find({ follower: userId })
-  const posts = await Post.find({ author: followedUsers, status: "published" })
+  const followedUsers = await Follow.find({ follower: userId }).select("following").lean()
+  const followedUserIds = followedUsers.map(f => f.following)
+  const posts = await Post.find({ author: { $in: followedUserIds }, status: "published" })
     .sort("-publishedAt")
     .skip(skip)
     .limit(limit + 1)
