@@ -2,6 +2,7 @@ import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
 import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 import Comment from "../../../src/models/Comment.js"
+import Like from "../../../src/models/Like.js"
 import User from "../../../src/models/User.js"
 import Post from "../../../src/models/Post.js"
 
@@ -57,6 +58,26 @@ describe("DELETE /api/posts/:postSlug", () => {
 
     const comments = await Comment.find({ post: dbPost!._id })
     expect(comments).toHaveLength(0)
+  })
+
+  it("should cascade delete all likes when post is deleted", async () => {
+    const post = await createPost(accessToken)
+    const dbPost = await Post.findOne({ slug: post.slug })
+
+    await request(app).post("/api/auth/register").send({
+      username: "jane",
+      email: "jane@example.com",
+      password: "Password1"
+    })
+    const jane = await User.findOne({ username: "jane" })
+    await Like.create({ user: jane!._id, post: dbPost!._id, type: "post" })
+
+    await request(app)
+      .delete(`/api/posts/${post.slug}`)
+      .set("Authorization", `Bearer ${accessToken}`)
+
+    const likes = await Like.find({ post: dbPost!._id })
+    expect(likes).toHaveLength(0)
   })
 
   it("should return 401 if no auth token", async () => {
