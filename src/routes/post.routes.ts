@@ -28,6 +28,6 @@ router.route("/:postSlug")
 router.route("/:postSlug/like")
   .post(authMiddleware, likePost)
   .delete(authMiddleware, unLikePost)
-router.route("/:postSlug/likes").get(getPostLikes)
+router.route("/:postSlug/likes").get(authMiddleware, getPostLikes)
 
 export default router

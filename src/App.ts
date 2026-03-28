@@ -5,6 +5,7 @@ import helmet from "helmet"
 import authRouter from "./routes/auth.routes.js"
 import userRouter from "./routes/user.routes.js"
 import postRouter from "./routes/post.routes.js"
+import commentRouter from "./routes/comment.routes.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 
 const app: Application = express()
@@ -22,6 +23,7 @@ const authLimiter = rateLimit({
 app.use("/api/auth", authLimiter, authRouter)
 app.use("/api/users", userRouter)
 app.use("/api/posts", postRouter)
+app.use("/api/posts", commentRouter)
 
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" })
