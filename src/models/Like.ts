@@ -28,8 +28,8 @@ const likeSchema = new Schema<ILike>({
   }
 }, { timestamps: true, versionKey: false })
 
-likeSchema.index({ user: 1, post: 1 }, { unique: true, sparse: true })
-likeSchema.index({ user: 1, comment: 1 }, { unique: true, sparse: true })
+likeSchema.index({ user: 1, post: 1 }, { unique: true, partialFilterExpression: { post: { $exists: true } } })
+likeSchema.index({ user: 1, comment: 1 }, { unique: true, partialFilterExpression: { comment: { $exists: true } } })
 likeSchema.index({ post: 1 })
 likeSchema.index({ comment: 1 })
 
