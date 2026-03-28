@@ -17,12 +17,7 @@ const getMyProfile = async (userId: string) => {
 
   const totalPosts = await Post.countDocuments({ author: userId, status: "published" })
 
-  return {
-    user: {
-      ...user,
-      totalPosts
-    },
-  }
+  return { ...user, totalPosts }
 }
 
 const updateProfile = async (
@@ -189,10 +184,13 @@ const updatePassword = async (
 
 const getPublicProfile = async (username: string) => {
   const user = await User.findOne({ username: username })
-    .select("-_id username avatar bio followersCount followingCount")
+    .select("_id username avatar bio followersCount followingCount")
     .lean()
   if (!user) throw new NotFoundError("User not found")
-  return user
+
+  const totalPosts = await Post.countDocuments({ author: user._id, status: "published" })
+  const { _id, ...rest } = user
+  return { ...rest, totalPosts }
 }
 
 const getPostsByUsername = async (
