@@ -205,7 +205,7 @@ const getPostLikes = async (postSlug: string, page: number, limit: number) => {
     .lean()
 
   const hasMore = (skip + limit) < post.likesCount
-  return { likes, hasMore, total: post.likesCount }
+  return { likes: likes.map(l => l.user), hasMore }
 }
 
 export {

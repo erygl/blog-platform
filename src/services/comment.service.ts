@@ -1,7 +1,8 @@
 import Post from "../models/Post.js"
 import Comment from "../models/Comment.js"
-import { NotFoundError } from "../errors/index.js"
+import { BadRequestError, ConflictError, NotFoundError } from "../errors/index.js"
 import Like from "../models/Like.js"
+import { mongo } from "mongoose"
 
 const getPostComments = async (postSlug: string, page: number, limit: number) => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
@@ -19,7 +20,7 @@ const getPostComments = async (postSlug: string, page: number, limit: number) =>
     .lean()
 
   const hasMore = comments.length > limit
-  return { comments, hasMore }
+  return { comments: comments.slice(0, limit), hasMore }
 }
 
 const addComment = async (content: string, userId: string, postSlug: string) => {
@@ -95,9 +96,156 @@ const deleteComment = async (
   ])
 }
 
+const likeComment = async (
+  userId: string,
+  postSlug: string,
+  commentId: string
+): Promise<void> => {
+  const post = await Post.findOne({ slug: postSlug, status: "published" })
+    .select("_id")
+    .lean()
+  if (!post) throw new NotFoundError("Post not found")
+
+  const comment = await Comment.findOne({ _id: commentId, post: post._id })
+    .select("_id")
+    .lean()
+  if (!comment) throw new NotFoundError("Comment not found")
+
+  try {
+    await Like.create({ user: userId, comment: commentId, type: "comment" })
+  } catch (error) {
+    if (error instanceof mongo.MongoServerError && error.code === 11000) {
+      throw new ConflictError("Comment already liked")
+    }
+    throw error
+  }
+
+  await Comment.findByIdAndUpdate(commentId, { $inc: { likesCount: 1 } })
+}
+
+const unlikeComment = async (
+  userId: string,
+  postSlug: string,
+  commentId: string
+): Promise<void> => {
+  const post = await Post.findOne({ slug: postSlug, status: "published" })
+    .select("_id")
+    .lean()
+  if (!post) throw new NotFoundError("Post not found")
+
+  const comment = await Comment.findOne({ _id: commentId, post: post._id })
+    .select("_id")
+    .lean()
+  if (!comment) throw new NotFoundError("Comment not found")
+
+  const unlike = await Like.findOneAndDelete(
+    { user: userId, comment: comment._id, type: "comment" }
+  )
+  if (!unlike) throw new BadRequestError("Comment not liked")
+  await Comment.findByIdAndUpdate(commentId, { $inc: { likesCount: -1 } })
+}
+
+const getCommentLikes = async (
+  postSlug: string,
+  commentId: string,
+  page: number,
+  limit: number
+) => {
+  const post = await Post.findOne({ slug: postSlug, status: "published" })
+    .select("_id")
+    .lean()
+  if (!post) throw new NotFoundError("Post not found")
+
+  const skip = (page - 1) * limit
+  const comment = await Comment.findOne({ _id: commentId, post: post._id })
+    .select("_id likesCount")
+    .lean()
+  if (!comment) throw new NotFoundError("Comment not found")
+
+  const likes = await Like.find({ comment: comment._id, type: "comment" })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .select("-_id user")
+    .populate("user", "-_id username avatar bio")
+    .lean()
+
+  const hasMore = skip + limit < comment.likesCount
+  return { likes: likes.map(l => l.user), hasMore }
+}
+
+const getCommentReplies = async (
+  postSlug: string,
+  commentId: string,
+  page: number,
+  limit: number
+) => {
+  const post = await Post.findOne({ slug: postSlug, status: "published" })
+    .select("_id")
+    .lean()
+  if (!post) throw new NotFoundError("Post not found")
+
+  const comment = await Comment.findOne(
+    { _id: commentId, post: post._id, parentComment: null }
+  )
+    .select("_id repliesCount")
+    .lean()
+  if (!comment) throw new NotFoundError("Comment not found")
+
+  const skip = (page - 1) * limit
+  const replies = await Comment.find({ post: post._id, parentComment: comment._id })
+    .sort({ createdAt: 1 })
+    .skip(skip)
+    .limit(limit + 1)
+    .select("-post -repliesCount")
+    .populate("author", "-_id username avatar")
+    .lean()
+
+  const hasMore = replies.length > limit
+  return { replies: replies.slice(0, limit), hasMore }
+}
+
+const addReply = async (
+  content: string,
+  userId: string,
+  postSlug: string,
+  commentId: string
+) => {
+  const commentedPost = await Post.findOne({ slug: postSlug, status: "published" })
+    .select("_id")
+    .lean()
+  if (!commentedPost) throw new NotFoundError("Post not found")
+
+  const comment = await Comment.findOne({ _id: commentId, post: commentedPost._id })
+    .select("_id parentComment")
+    .lean()
+  if (!comment) throw new NotFoundError("Comment not found")
+  if (comment.parentComment) throw new BadRequestError("Cannot reply to a reply")
+
+  const reply = await Comment.create({
+    post: commentedPost._id,
+    author: userId,
+    content: content,
+    parentComment: comment._id
+  })
+
+  await Promise.all([
+    Comment.findByIdAndUpdate(comment._id, { $inc: { repliesCount: 1 } }),
+    Post.findByIdAndUpdate(commentedPost._id, { $inc: { commentsCount: 1 } })
+  ])
+
+  const { post, author, repliesCount, ...rest } = reply.toObject()
+  return rest
+}
+
 export {
   getPostComments,
   addComment,
   editComment,
-  deleteComment
+  deleteComment,
+  likeComment,
+  unlikeComment,
+  getCommentLikes,
+  getCommentReplies,
+  addReply
 }
