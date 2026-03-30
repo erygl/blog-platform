@@ -141,7 +141,7 @@ const unlikeComment = async (
   const unlike = await Like.findOneAndDelete(
     { user: userId, comment: comment._id, type: "comment" }
   )
-  if (!unlike) throw new BadRequestError("Comment not liked")
+  if (!unlike) throw new ConflictError("Comment not liked")
   await Comment.findByIdAndUpdate(commentId, { $inc: { likesCount: -1 } })
 }
 

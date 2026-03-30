@@ -192,7 +192,7 @@ const likePost = async (postSlug: string, userId: string): Promise<void> => {
     }
     throw error
   }
-  await Post.findOneAndUpdate({ slug: postSlug }, { $inc: { likesCount: 1 } })
+  await Post.findByIdAndUpdate(post._id, { $inc: { likesCount: 1 } })
 }
 
 const unlikePost = async (postSlug: string, userId: string): Promise<void> => {
@@ -201,8 +201,8 @@ const unlikePost = async (postSlug: string, userId: string): Promise<void> => {
   if (!post) throw new NotFoundError("Post not found")
 
   const unlike = await Like.findOneAndDelete({ user: userId, post: post._id, type: "post" })
-  if (!unlike) throw new BadRequestError("Post not liked")
-  await Post.findOneAndUpdate({ slug: postSlug }, { $inc: { likesCount: -1 } })
+  if (!unlike) throw new ConflictError("Post not liked")
+  await Post.findByIdAndUpdate(post._id, { $inc: { likesCount: -1 } })
 }
 
 const getPostLikes = async (postSlug: string, page: number, limit: number) => {
