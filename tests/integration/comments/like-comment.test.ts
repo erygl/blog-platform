@@ -110,11 +110,11 @@ describe("DELETE /api/posts/:postSlug/comments/:commentId/like", () => {
     expect(res.status).toBe(200)
   })
 
-  it("should return 400 if comment is not liked", async () => {
+  it("should return 409 if comment is not liked", async () => {
     const res = await request(app)
       .delete(`/api/posts/${postSlug}/comments/${commentId}/like`)
       .set("Authorization", `Bearer ${readerToken}`)
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(409)
   })
 
   it("should return 404 if comment does not exist", async () => {

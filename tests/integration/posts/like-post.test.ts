@@ -87,11 +87,11 @@ describe("DELETE /api/posts/:postSlug/like", () => {
     expect(res.body.message).toBe("Post unliked successfully")
   })
 
-  it("should return 400 if post is not liked yet", async () => {
+  it("should return 409 if post is not liked yet", async () => {
     const res = await request(app)
       .delete(`/api/posts/${postSlug}/like`)
       .set("Authorization", `Bearer ${readerToken}`)
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(409)
   })
 
   it("should return 404 if post does not exist", async () => {
