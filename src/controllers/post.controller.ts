@@ -74,11 +74,11 @@ const likePost = async (req: Request, res: Response) => {
   res.status(200).json({ message: "Post liked successfully" })
 }
 
-const unLikePost = async (req: Request, res: Response) => {
+const unlikePost = async (req: Request, res: Response) => {
   const postSlug = req.params.postSlug as string
   const userId = req.user!.userId
 
-  await postService.unLikePost(postSlug, userId)
+  await postService.unlikePost(postSlug, userId)
 
   res.status(200).json({ message: "Post unliked successfully" })
 }
@@ -102,6 +102,6 @@ export {
   updatePost,
   deletePost,
   likePost,
-  unLikePost,
+  unlikePost,
   getPostLikes
 }
