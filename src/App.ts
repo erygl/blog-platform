@@ -7,6 +7,7 @@ import userRouter from "./routes/user.routes.js"
 import postRouter from "./routes/post.routes.js"
 import commentRouter from "./routes/comment.routes.js"
 import tagRouter from "./routes/tag.routes.js"
+import searchRouter from "./routes/search.routes.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 
 const app: Application = express()
@@ -26,6 +27,7 @@ app.use("/api/users", userRouter)
 app.use("/api/posts", postRouter)
 app.use("/api/posts", commentRouter)
 app.use("/api/tags", tagRouter)
+app.use("/api/search", searchRouter)
 
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" })
