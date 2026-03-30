@@ -24,7 +24,7 @@ const getTagWithPosts = async (tagSlug: string, page: number, limit: number) => 
     .skip(skip)
     .limit(limit + 1)
     .select("-_id title author coverImage excerpt slug likesCount commentsCount")
-    .populate("author", "-_id username avatar")
+    .populate("author", "-_id username name avatar")
     .lean()
 
   const hasMore = posts.length > limit

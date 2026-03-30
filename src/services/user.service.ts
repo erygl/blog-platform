@@ -22,7 +22,7 @@ const getMyProfile = async (userId: string) => {
 
 const updateProfile = async (
   userId: string,
-  data: { username?: string, bio?: string, avatar?: string }
+  data: { username?: string, name?: string, bio?: string, avatar?: string }
 ) => {
   const user = await User.findByIdAndUpdate(userId, data, { returnDocument: "after" })
   if (!user) throw new NotFoundError("User not found")
@@ -126,7 +126,7 @@ const getLikedPosts = async (userId: string, page: number, limit: number) => {
 
   const postsData = await Post.find({ _id: { $in: slicedPostIds }, status: "published" })
     .select("title author coverImage excerpt slug likesCount commentsCount publishedAt")
-    .populate("author", "-_id username avatar")
+    .populate("author", "-_id username name avatar")
     .lean()
 
   const posts = slicedPostIds.map(id => {
@@ -184,7 +184,7 @@ const updatePassword = async (
 
 const getPublicProfile = async (username: string) => {
   const user = await User.findOne({ username: username })
-    .select("_id username avatar bio followersCount followingCount")
+    .select("_id username name avatar bio followersCount followingCount")
     .lean()
   if (!user) throw new NotFoundError("User not found")
 
@@ -268,7 +268,7 @@ const getFollowersList = async (username: string, page: number, limit: number) =
     .skip(skip)
     .limit(limit + 1)
     .select("-_id follower")
-    .populate("follower", "-_id username avatar")
+    .populate("follower", "-_id username name avatar")
     .lean()
 
   const hasMore = followers.length > limit
@@ -287,7 +287,7 @@ const getFollowingList = async (username: string, page: number, limit: number) =
     .skip(skip)
     .limit(limit + 1)
     .select("-_id following")
-    .populate("following", "-_id username avatar")
+    .populate("following", "-_id username name avatar")
     .lean()
 
   const hasMore = following.length > limit

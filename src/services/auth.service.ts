@@ -18,6 +18,7 @@ import crypto from "crypto"
 const registerUser = async (input: {
   username: string,
   email: string,
+  name: string,
   password: string;
   bio?: string,
   avatar?: string,
@@ -32,6 +33,7 @@ const registerUser = async (input: {
   return {
     username: user.username,
     email: user.email,
+    name: user.name,
     bio: user.bio,
   }
 }

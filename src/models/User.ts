@@ -1,8 +1,9 @@
-import { Schema, model, Types } from "mongoose"
+import { Schema, model } from "mongoose"
 
 interface IUser {
   username: string,
   email: string,
+  name: string,
   password: string,
   avatar: string | null,
   bio: string,
@@ -29,6 +30,12 @@ const userSchema = new Schema<IUser>({
     unique: true,
     trim: true,
     lowercase: true,
+    required: true
+  },
+  name: {
+    type: String,
+    minLength: [2, "Must be at least 2 characters"],
+    maxLength: [50, "Must be less than 50 characters"],
     required: true
   },
   password: {

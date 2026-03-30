@@ -15,6 +15,7 @@ const updateProfile = async (req: Request, res: Response) => {
   res.status(200).json({
     user: {
       username: user.username,
+      name: user.name,
       bio: user.bio,
       avatar: user.avatar
     }

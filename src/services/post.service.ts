@@ -28,7 +28,7 @@ const getTrendingPosts = async (page: number, limit: number) => {
     .skip(skip)
     .limit(limit + 1)
     .select("-_id title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
-    .populate("author", "-_id username avatar")
+    .populate("author", "-_id username name avatar")
     .lean()
 
   const hasMore = posts.length > limit
@@ -71,7 +71,7 @@ const getFeed = async (userId: string, page: number, limit: number) => {
     .skip(skip)
     .limit(limit + 1)
     .select("-_id title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
-    .populate("author", "-_id username avatar")
+    .populate("author", "-_id username name avatar")
     .lean()
 
   const hasMore = posts.length > limit
@@ -94,7 +94,7 @@ const getSingleDraft = async (userId: string, postSlug: string) => {
     status: "draft"
   })
     .select("-excerpt -trendingScore")
-    .populate("author", "-_id username avatar")
+    .populate("author", "-_id username name avatar")
     .populate("tags", "-_id name slug")
     .lean()
 
@@ -109,7 +109,7 @@ const getSinglePost = async (postSlug: string) => {
     { returnDocument: "after" }
   )
     .select("-_id -status -excerpt -trendingScore -createdAt -updatedAt")
-    .populate("author", "-_id username avatar")
+    .populate("author", "-_id username name avatar")
     .populate("tags", "-_id name slug")
     .lean()
 
@@ -217,7 +217,7 @@ const getPostLikes = async (postSlug: string, page: number, limit: number) => {
     .skip(skip)
     .limit(limit + 1)
     .select("-_id user")
-    .populate("user", "-_id username avatar bio")
+    .populate("user", "-_id username name avatar bio")
     .lean()
 
   const hasMore = likes.length > limit

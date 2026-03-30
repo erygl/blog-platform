@@ -16,7 +16,7 @@ const getPostComments = async (postSlug: string, page: number, limit: number) =>
     .skip(skip)
     .limit(limit + 1)
     .select("-post")
-    .populate("author", "-_id username avatar")
+    .populate("author", "-_id username name avatar")
     .lean()
 
   const hasMore = comments.length > limit
@@ -167,7 +167,7 @@ const getCommentLikes = async (
     .skip(skip)
     .limit(limit)
     .select("-_id user")
-    .populate("user", "-_id username avatar bio")
+    .populate("user", "-_id username name avatar bio")
     .lean()
 
   const hasMore = skip + limit < comment.likesCount
@@ -198,7 +198,7 @@ const getCommentReplies = async (
     .skip(skip)
     .limit(limit + 1)
     .select("-post -repliesCount")
-    .populate("author", "-_id username avatar")
+    .populate("author", "-_id username name avatar")
     .lean()
 
   const hasMore = replies.length > limit
