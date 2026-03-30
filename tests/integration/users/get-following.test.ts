@@ -14,6 +14,7 @@ beforeEach(async () => {
 
   await request(app).post("/api/auth/register").send({
     username: "jane",
+    name: "Jane Doe",
     email: "jane@example.com",
     password: "Password1"
   })
@@ -52,9 +53,9 @@ describe("GET /api/users/:username/following", () => {
 
   it("should respect limit and return hasMore", async () => {
     for (const user of [
-      { username: "user1", email: "user1@example.com" },
-      { username: "user2", email: "user2@example.com" },
-      { username: "user3", email: "user3@example.com" },
+      { username: "user1", name: "User One", email: "user1@example.com" },
+      { username: "user2", name: "User Two", email: "user2@example.com" },
+      { username: "user3", name: "User Three", email: "user3@example.com" },
     ]) {
       await request(app).post("/api/auth/register").send({ ...user, password: "Password1" })
       await request(app)

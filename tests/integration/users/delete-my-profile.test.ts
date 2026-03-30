@@ -54,6 +54,7 @@ describe("DELETE /api/users/me", () => {
 
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })
@@ -75,6 +76,7 @@ describe("DELETE /api/users/me", () => {
   it("should decrement likesCount on posts the user had liked", async () => {
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })
@@ -102,6 +104,7 @@ describe("DELETE /api/users/me", () => {
   it("should delete the user's comments and decrement commentsCount on posts", async () => {
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })
@@ -130,6 +133,7 @@ describe("DELETE /api/users/me", () => {
   it("should update follow counts when a followed/following user is deleted", async () => {
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })

@@ -14,6 +14,7 @@ export async function cleanDb() {
 export async function registerUser() {
   const data = {
     username: "john",
+    name: "John Doe",
     email: "john@example.com",
     password: "Password1"
   }

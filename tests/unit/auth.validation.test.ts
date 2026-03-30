@@ -5,6 +5,7 @@ describe("registerSchema", () => {
   it("should pass with valid input", () => {
     const result = registerSchema.safeParse({
       username: "john",
+      name: "John Doe",
       email: "john@example.com",
       password: "Password1"
     })

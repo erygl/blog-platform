@@ -24,6 +24,7 @@ beforeEach(async () => {
 
   await request(app).post("/api/auth/register").send({
     username: "jane",
+    name: "Jane Doe",
     email: "jane@example.com",
     password: "Password1"
   })

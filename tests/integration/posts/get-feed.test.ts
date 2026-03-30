@@ -39,6 +39,7 @@ describe("GET /api/posts/feed", () => {
   it("should return posts from followed users", async () => {
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })
@@ -64,6 +65,7 @@ describe("GET /api/posts/feed", () => {
   it("should not return posts from users not followed", async () => {
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })
@@ -83,6 +85,7 @@ describe("GET /api/posts/feed", () => {
   it("should respect limit and return hasMore", async () => {
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })
@@ -110,6 +113,7 @@ describe("GET /api/posts/feed", () => {
   it("should not return drafts from followed users", async () => {
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })

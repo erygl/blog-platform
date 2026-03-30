@@ -38,11 +38,13 @@ describe("DELETE /api/posts/:postSlug", () => {
 
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })
     await request(app).post("/api/auth/register").send({
       username: "bob",
+      name: "Bob Smith",
       email: "bob@example.com",
       password: "Password1"
     })
@@ -66,6 +68,7 @@ describe("DELETE /api/posts/:postSlug", () => {
 
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })
@@ -96,6 +99,7 @@ describe("DELETE /api/posts/:postSlug", () => {
   it("should return 404 if user does not own the post", async () => {
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })

@@ -44,6 +44,7 @@ describe("GET /api/posts/me/drafts/:postSlug", () => {
   it("should return 404 for another user's draft", async () => {
     await request(app).post("/api/auth/register").send({
       username: "jane",
+      name: "Jane Doe",
       email: "jane@example.com",
       password: "Password1"
     })

@@ -19,6 +19,7 @@ beforeEach(async () => {
 
   await request(app).post("/api/auth/register").send({
     username: "jane",
+    name: "Jane Doe",
     email: "jane@example.com",
     password: "Password1"
   })
@@ -133,6 +134,7 @@ describe("GET /api/posts/:postSlug/likes", () => {
   it("should respect limit and return hasMore", async () => {
     await request(app).post("/api/auth/register").send({
       username: "bob",
+      name: "Bob Smith",
       email: "bob@example.com",
       password: "Password1"
     })

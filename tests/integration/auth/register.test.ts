@@ -17,12 +17,14 @@ describe("POST api/auth/register", () => {
       .post("/api/auth/register")
       .send({
         username: "john",
+        name: "John Doe",
         email: "john@example.com",
         password: "Password1"
       })
     expect(res.status).toBe(201)
     expect(res.body.user).toHaveProperty("email", "john@example.com")
     expect(res.body.user).toHaveProperty("username", "john")
+    expect(res.body.user).toHaveProperty("name", "John Doe")
     expect(res.body.user).not.toHaveProperty("password")
     expect(emailUtils.sendVerificationEmail).toHaveBeenCalledWith(
       "john@example.com",
@@ -35,6 +37,7 @@ describe("POST api/auth/register", () => {
       .post("/api/auth/register")
       .send({
         username: "john",
+        name: "John Doe",
         email: "john@example.com",
         password: "Password1"
       })
@@ -42,6 +45,7 @@ describe("POST api/auth/register", () => {
       .post("/api/auth/register")
       .send({
         username: "john2",
+        name: "John Two",
         email: "john@example.com",
         password: "Password1"
       })
@@ -53,6 +57,7 @@ describe("POST api/auth/register", () => {
       .post("/api/auth/register")
       .send({
         username: "john",
+        name: "John Doe",
         email: "john@example.com",
         password: "Password1"
       })
@@ -60,6 +65,7 @@ describe("POST api/auth/register", () => {
       .post("/api/auth/register")
       .send({
         username: "john",
+        name: "John Again",
         email: "john2@example.com",
         password: "Password1"
       })
