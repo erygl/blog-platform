@@ -3,6 +3,7 @@ import { env } from "./env.js"
 
 export const connectDB = async () => {
   try {
+    mongoose.set("transactionAsyncLocalStorage", true)
     await mongoose.connect(env.dbUrl)
     console.log("Connected to database")
   } catch (error) {

@@ -81,7 +81,7 @@ const PostSchema = new Schema<IPost>({
     type: Date,
     default: null
   }
-}, { timestamps: true })
+}, { timestamps: true, versionKey: false })
 
 const Post = model<IPost>("Post", PostSchema)
 

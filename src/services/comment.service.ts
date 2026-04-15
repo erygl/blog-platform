@@ -2,7 +2,7 @@ import Post from "../models/Post.js"
 import Comment from "../models/Comment.js"
 import { BadRequestError, ConflictError, NotFoundError } from "../errors/index.js"
 import Like from "../models/Like.js"
-import { mongo } from "mongoose"
+import mongoose, { mongo } from "mongoose"
 
 const getPostComments = async (postSlug: string, page: number, limit: number) => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
@@ -24,20 +24,27 @@ const getPostComments = async (postSlug: string, page: number, limit: number) =>
 }
 
 const addComment = async (content: string, userId: string, postSlug: string) => {
-  const commentedPost = await Post.findOne({ slug: postSlug, status: "published" })
-    .select("_id")
-    .lean()
-  if (!commentedPost) throw new NotFoundError("Post not found")
+  const session = await mongoose.startSession()
+  try {
+    return await session.withTransaction(async () => {
+      const commentedPost = await Post.findOne({ slug: postSlug, status: "published" })
+        .select("_id")
+        .lean()
+      if (!commentedPost) throw new NotFoundError("Post not found")
 
-  const comment = await Comment.create({
-    post: commentedPost._id,
-    author: userId,
-    content: content
-  })
+      const comment = await Comment.create({
+        post: commentedPost._id,
+        author: userId,
+        content: content
+      })
 
-  await Post.findByIdAndUpdate(commentedPost._id, { $inc: { commentsCount: 1 } })
-  const { post, author, ...rest } = comment.toObject()
-  return rest
+      await Post.findByIdAndUpdate(commentedPost._id, { $inc: { commentsCount: 1 } })
+      const { post, author, ...rest } = comment.toObject()
+      return rest
+    })
+  } finally {
+    await session.endSession()
+  }
 }
 
 const editComment = async (
@@ -67,33 +74,41 @@ const deleteComment = async (
   postSlug: string,
   commentId: string
 ): Promise<void> => {
-  const post = await Post.findOne({ slug: postSlug, status: "published" })
-    .select("_id")
-    .lean()
-  if (!post) throw new NotFoundError("Post not found")
+  const session = await mongoose.startSession()
+  try {
+    await session.withTransaction(async () => {
+      const post = await Post.findOne({ slug: postSlug, status: "published" })
+        .select("_id")
+        .lean()
+      if (!post) throw new NotFoundError("Post not found")
 
-  const comment = await Comment.findOneAndDelete(
-    { _id: commentId, post: post._id, author: userId }
-  )
-  if (!comment) throw new NotFoundError("Comment not found")
+      const comment = await Comment.findOneAndDelete(
+        { _id: commentId, post: post._id, author: userId }
+      )
+      if (!comment) throw new NotFoundError("Comment not found")
 
-  const replies = await Comment.find({ parentComment: comment._id })
-    .select("_id")
-    .lean()
-  const replyIds = replies.map(r => r._id)
+      const replies = await Comment.find({ parentComment: comment._id })
+        .select("_id")
+        .lean()
+      const replyIds = replies.map(r => r._id)
 
-  await Promise.all([
-    Like.deleteMany({ comment: { $in: [comment._id, ...replyIds] } }),
-    Comment.deleteMany({ parentComment: comment._id }),
-    Post.findByIdAndUpdate(
-      post._id,
-      { $inc: { commentsCount: -(1 + replies.length) } }
-    ),
-    ...comment.parentComment
-      ? [Comment.findByIdAndUpdate(comment.parentComment,
-        { $inc: { repliesCount: -1 } })]
-      : []
-  ])
+      await Like.deleteMany({ comment: { $in: [comment._id, ...replyIds] } })
+      await Comment.deleteMany({ parentComment: comment._id })
+      await Post.findByIdAndUpdate(
+        post._id,
+        { $inc: { commentsCount: -(1 + replies.length) } }
+      )
+
+      if (comment.parentComment) {
+        await Comment.findByIdAndUpdate(
+          comment.parentComment,
+          { $inc: { repliesCount: -1 } }
+        )
+      }
+    })
+  } finally {
+    await session.endSession()
+  }
 }
 
 const likeComment = async (
@@ -101,26 +116,29 @@ const likeComment = async (
   postSlug: string,
   commentId: string
 ): Promise<void> => {
-  const post = await Post.findOne({ slug: postSlug, status: "published" })
-    .select("_id")
-    .lean()
-  if (!post) throw new NotFoundError("Post not found")
-
-  const comment = await Comment.findOne({ _id: commentId, post: post._id })
-    .select("_id")
-    .lean()
-  if (!comment) throw new NotFoundError("Comment not found")
-
+  const session = await mongoose.startSession()
   try {
-    await Like.create({ user: userId, comment: commentId, type: "comment" })
-  } catch (error) {
-    if (error instanceof mongo.MongoServerError && error.code === 11000) {
-      throw new ConflictError("Comment already liked")
-    }
-    throw error
-  }
+    await session.withTransaction(async () => {
+      const comment = await Comment.findOne({ _id: commentId })
+        .select("_id")
+        .populate({ path: "post", match: { slug: postSlug, status: "published" } })
+        .lean()
+      if (!comment || !comment.post) throw new NotFoundError("Comment not found")
 
-  await Comment.findByIdAndUpdate(commentId, { $inc: { likesCount: 1 } })
+      try {
+        await Like.create({ user: userId, comment: commentId, type: "comment" })
+      } catch (error) {
+        if (error instanceof mongo.MongoServerError && error.code === 11000) {
+          throw new ConflictError("Comment already liked")
+        }
+        throw error
+      }
+
+      await Comment.findByIdAndUpdate(commentId, { $inc: { likesCount: 1 } })
+    })
+  } finally {
+    await session.endSession()
+  }
 }
 
 const unlikeComment = async (
@@ -128,21 +146,24 @@ const unlikeComment = async (
   postSlug: string,
   commentId: string
 ): Promise<void> => {
-  const post = await Post.findOne({ slug: postSlug, status: "published" })
-    .select("_id")
-    .lean()
-  if (!post) throw new NotFoundError("Post not found")
+  const session = await mongoose.startSession()
+  try {
+    await session.withTransaction(async () => {
+      const comment = await Comment.findOne({ _id: commentId })
+        .select("_id")
+        .populate({ path: "post", match: { slug: postSlug, status: "published" } })
+        .lean()
+      if (!comment || !comment.post) throw new NotFoundError("Comment not found")
 
-  const comment = await Comment.findOne({ _id: commentId, post: post._id })
-    .select("_id")
-    .lean()
-  if (!comment) throw new NotFoundError("Comment not found")
-
-  const unlike = await Like.findOneAndDelete(
-    { user: userId, comment: comment._id, type: "comment" }
-  )
-  if (!unlike) throw new ConflictError("Comment not liked")
-  await Comment.findByIdAndUpdate(commentId, { $inc: { likesCount: -1 } })
+      const unlike = await Like.findOneAndDelete(
+        { user: userId, comment: comment._id, type: "comment" }
+      )
+      if (!unlike) throw new ConflictError("Comment not liked")
+      await Comment.findByIdAndUpdate(commentId, { $inc: { likesCount: -1 } })
+    })
+  } finally {
+    await session.endSession()
+  }
 }
 
 const getCommentLikes = async (
@@ -211,31 +232,37 @@ const addReply = async (
   postSlug: string,
   commentId: string
 ) => {
-  const commentedPost = await Post.findOne({ slug: postSlug, status: "published" })
-    .select("_id")
-    .lean()
-  if (!commentedPost) throw new NotFoundError("Post not found")
+  const session = await mongoose.startSession()
+  try {
+    return await session.withTransaction(async () => {
+      const comment = await Comment.findOne({ _id: commentId })
+        .select("_id parentComment")
+        .populate(
+          {
+            path: "post",
+            match: { slug: postSlug, status: "published" },
+            select: "_id"
+          })
+        .lean()
+      if (!comment || !comment.post) throw new NotFoundError("Comment not found")
+      if (comment.parentComment) throw new BadRequestError("Cannot reply to a reply")
 
-  const comment = await Comment.findOne({ _id: commentId, post: commentedPost._id })
-    .select("_id parentComment")
-    .lean()
-  if (!comment) throw new NotFoundError("Comment not found")
-  if (comment.parentComment) throw new BadRequestError("Cannot reply to a reply")
+      const reply = await Comment.create({
+        post: comment.post,
+        author: userId,
+        content: content,
+        parentComment: comment._id
+      })
 
-  const reply = await Comment.create({
-    post: commentedPost._id,
-    author: userId,
-    content: content,
-    parentComment: comment._id
-  })
+      await Comment.findByIdAndUpdate(comment._id, { $inc: { repliesCount: 1 } })
+      await Post.findByIdAndUpdate(comment.post, { $inc: { commentsCount: 1 } })
 
-  await Promise.all([
-    Comment.findByIdAndUpdate(comment._id, { $inc: { repliesCount: 1 } }),
-    Post.findByIdAndUpdate(commentedPost._id, { $inc: { commentsCount: 1 } })
-  ])
-
-  const { post, author, repliesCount, ...rest } = reply.toObject()
-  return rest
+      const { post, author, repliesCount, ...rest } = reply.toObject()
+      return rest
+    })
+  } finally {
+    await session.endSession()
+  }
 }
 
 export {

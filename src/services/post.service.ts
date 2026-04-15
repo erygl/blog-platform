@@ -2,23 +2,28 @@ import Post from "../models/Post.js";
 import Tag from "../models/Tag.js";
 import Comment from "../models/Comment.js";
 import { generateSlug } from "../utils/slug.js";
-import { BadRequestError, ConflictError, NotFoundError } from "../errors/index.js";
+import { ConflictError, NotFoundError } from "../errors/index.js";
 import Like from "../models/Like.js";
-import { mongo } from "mongoose";
+import mongoose, { mongo } from "mongoose";
 import Follow from "../models/Follow.js";
 
 const resolveTagIds = async (tagNames: string[]) => {
-  return Promise.all(
-    tagNames.map(async (name) => {
-      const slug = generateSlug(name)
-      const tag = await Tag.findOneAndUpdate(
-        { name },
-        { $setOnInsert: { name, slug } },
-        { upsert: true, returnDocument: "after" }
-      )
-      return tag._id
-    })
+  if (tagNames.length === 0) return []
+  await Tag.bulkWrite(
+    tagNames.map(name => ({
+      updateOne: {
+        filter: { name: name },
+        update: { $setOnInsert: { name, slug: generateSlug(name) } },
+        upsert: true
+      }
+    }))
   )
+
+  const tags = await Tag.find({ name: { $in: tagNames } })
+    .select("_id name")
+    .lean()
+
+  return tagNames.map(name => tags.find(t => t.name === name)!._id)
 }
 
 const getTrendingPosts = async (page: number, limit: number) => {
@@ -45,21 +50,30 @@ const createPost = async (data: {
   const slug = generateSlug(data.title, true)
   const excerpt = data.content.slice(0, 100).trimEnd()
 
-  const tagIds = await resolveTagIds(data.tags ?? [])
-  if (data.status === "published") {
-    await Tag.updateMany({ _id: { $in: tagIds } }, { $inc: { postCount: 1 } })
+  const session = await mongoose.startSession()
+  try {
+    return await session.withTransaction(async () => {
+      const tagIds = await resolveTagIds(data.tags ?? [])
+
+      const post = await Post.create({
+        ...data,
+        author: userId,
+        slug,
+        excerpt,
+        tags: tagIds,
+        publishedAt: data.status === "published" ? new Date() : null
+      })
+
+      if (data.status === "published") {
+        await Tag.updateMany({ _id: { $in: tagIds } }, { $inc: { postCount: 1 } })
+      }
+
+      return post
+    })
+  } finally {
+    await session.endSession()
   }
 
-  const post = await Post.create({
-    ...data,
-    author: userId,
-    slug,
-    excerpt,
-    tags: tagIds,
-    publishedAt: data.status === "published" ? new Date() : null
-  })
-
-  return post
 }
 
 const getFeed = async (userId: string, page: number, limit: number) => {
@@ -128,81 +142,110 @@ const updatePost = async (
   postSlug: string,
   userId: string
 ) => {
-  const post = await Post.findOne({ slug: postSlug }).lean()
-  if (!post || post.author.toString() !== userId)
-    throw new NotFoundError("Post not found")
 
-  let tagIds;
-  if (data.tags) {
-    tagIds = await resolveTagIds(data.tags)
+  const session = await mongoose.startSession()
+  try {
+    return await session.withTransaction(async () => {
+      const post = await Post.findOne({ slug: postSlug }).lean()
+      if (!post || post.author.toString() !== userId)
+        throw new NotFoundError("Post not found")
+
+      let tagIds;
+      if (data.tags) {
+        tagIds = await resolveTagIds(data.tags)
+      }
+
+      const updatedPost = await Post.findOneAndUpdate(
+        { slug: postSlug },
+        {
+          ...data,
+          excerpt: data.content ? data.content.slice(0, 100).trimEnd() : post.excerpt,
+          tags: tagIds ?? post.tags,
+          publishedAt: !post.publishedAt && data.status === "published" ? new Date() : post.publishedAt
+        },
+        { returnDocument: "after" }
+      )
+      // update postCounts based on post status
+      const newStatus = data.status ?? post.status
+      const newTagIds = tagIds ?? post.tags
+      const currentlyCounted = post.status === "published" ? post.tags : []
+      const newCounted = newStatus === "published" ? newTagIds : []
+      await Tag.bulkWrite([
+        {
+          updateMany: {
+            filter: { _id: { $in: currentlyCounted, $nin: newCounted } },
+            update: { $inc: { postCount: -1 } }
+          }
+        }, {
+          updateMany: {
+            filter: { _id: { $in: newCounted, $nin: currentlyCounted } },
+            update: { $inc: { postCount: 1 } }
+          }
+        }
+      ])
+
+      return updatedPost
+    })
+  } finally {
+    await session.endSession()
   }
-
-  // update postCounts based on post status
-  const newStatus = data.status ?? post.status
-  const newTagIds = tagIds ?? post.tags
-  const currentlyCounted = post.status === "published" ? post.tags : []
-  const newCounted = newStatus === "published" ? newTagIds : []
-  await Promise.all([
-    Tag.updateMany(
-      { _id: { $in: currentlyCounted, $nin: newCounted } },
-      { $inc: { postCount: -1 } }
-    ),
-    Tag.updateMany(
-      { _id: { $in: newCounted, $nin: currentlyCounted } },
-      { $inc: { postCount: 1 } }
-    ),
-  ])
-
-  const updatedPost = await Post.findOneAndUpdate(
-    { slug: postSlug },
-    {
-      ...data,
-      excerpt: data.content ? data.content.slice(0, 100).trimEnd() : post.excerpt,
-      tags: tagIds ?? post.tags,
-      publishedAt: !post.publishedAt && data.status === "published" ? new Date() : post.publishedAt
-    },
-    { returnDocument: "after" }
-  )
-  return updatedPost
 }
 
 const deletePost = async (postSlug: string, userId: string): Promise<void> => {
-  const post = await Post.findOneAndDelete({ slug: postSlug, author: userId })
-  if (!post) throw new NotFoundError("Post not found")
-  await Promise.all([
-    Like.deleteMany({ post: post._id }),
-    Comment.deleteMany({ post: post._id }),
-    ...(post.status === "published"
-      ? [Tag.updateMany({ _id: { $in: post.tags } }, { $inc: { postCount: -1 } })]
-      : []
-    )
-  ])
+  const session = await mongoose.startSession()
+  try {
+    await session.withTransaction(async () => {
+      const post = await Post.findOneAndDelete({ slug: postSlug, author: userId })
+      if (!post) throw new NotFoundError("Post not found")
+      await Like.deleteMany({ post: post._id })
+      await Comment.deleteMany({ post: post._id })
+      if (post.status === "published")
+        await Tag.updateMany({ _id: { $in: post.tags } }, { $inc: { postCount: -1 } })
+    })
+  } finally {
+    await session.endSession()
+  }
 }
 
 const likePost = async (postSlug: string, userId: string): Promise<void> => {
-  const post = await Post.findOne({ slug: postSlug, status: "published" })
-    .select("_id").lean()
-  if (!post) throw new NotFoundError("Post not found")
-
+  const session = await mongoose.startSession()
   try {
-    await Like.create({ user: userId, post: post._id, type: "post" })
-  } catch (error) {
-    if (error instanceof mongo.MongoServerError && error.code === 11000) {
-      throw new ConflictError("Post already liked")
-    }
-    throw error
+    await session.withTransaction(async () => {
+
+      const post = await Post.findOne({ slug: postSlug, status: "published" })
+        .select("_id").lean()
+      if (!post) throw new NotFoundError("Post not found")
+
+      try {
+        await Like.create({ user: userId, post: post._id, type: "post" })
+      } catch (error) {
+        if (error instanceof mongo.MongoServerError && error.code === 11000) {
+          throw new ConflictError("Post already liked")
+        }
+        throw error
+      }
+      await Post.findByIdAndUpdate(post._id, { $inc: { likesCount: 1 } })
+    })
+  } finally {
+    await session.endSession()
   }
-  await Post.findByIdAndUpdate(post._id, { $inc: { likesCount: 1 } })
 }
 
 const unlikePost = async (postSlug: string, userId: string): Promise<void> => {
-  const post = await Post.findOne({ slug: postSlug, status: "published" })
-    .select("_id").lean()
-  if (!post) throw new NotFoundError("Post not found")
+  const session = await mongoose.startSession()
+  try {
+    await session.withTransaction(async () => {
+      const post = await Post.findOne({ slug: postSlug, status: "published" })
+        .select("_id").lean()
+      if (!post) throw new NotFoundError("Post not found")
 
-  const unlike = await Like.findOneAndDelete({ user: userId, post: post._id, type: "post" })
-  if (!unlike) throw new ConflictError("Post not liked")
-  await Post.findByIdAndUpdate(post._id, { $inc: { likesCount: -1 } })
+      const unlike = await Like.findOneAndDelete({ user: userId, post: post._id, type: "post" })
+      if (!unlike) throw new ConflictError("Post not liked")
+      await Post.findByIdAndUpdate(post._id, { $inc: { likesCount: -1 } })
+    })
+  } finally {
+    await session.endSession()
+  }
 }
 
 const getPostLikes = async (postSlug: string, page: number, limit: number) => {

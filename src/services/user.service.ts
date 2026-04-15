@@ -6,8 +6,9 @@ import bcrypt from "bcryptjs"
 import { sendVerificationEmail } from "../utils/email.js"
 import { createVerificationToken } from "../utils/token.js"
 import Like from "../models/Like.js"
-import { mongo, Types } from "mongoose"
+import mongoose, { mongo, Types } from "mongoose"
 import Follow from "../models/Follow.js"
+import Tag from "../models/Tag.js"
 
 const getMyProfile = async (userId: string) => {
   const user = await User.findById(userId)
@@ -30,83 +31,159 @@ const updateProfile = async (
 }
 
 const deleteMyProfile = async (userId: string): Promise<void> => {
-  const user = await User.findById(userId)
-  if (!user) throw new NotFoundError("User not found")
+  const session = await mongoose.startSession()
+  try {
+    await session.withTransaction(async () => {
+      const user = await User.findById(userId).lean()
+      if (!user) throw new NotFoundError("User not found")
 
-  const posts = await Post.find({ author: userId }).select("_id").lean()
-  const postIds = posts.map(p => p._id)
+      const authorPosts = await Post.find({ author: userId })
+        .select("_id tags status")
+        .lean()
+      const postIds = authorPosts.map(p => p._id)
 
-  // delete comments and likes on all of the user's own posts
-  await Promise.all([
-    Comment.deleteMany({ post: { $in: postIds } }),
-    Like.deleteMany({ post: { $in: postIds } })
-  ])
+      // delete comments on all of the user's own posts
+      await Comment.deleteMany({ post: { $in: postIds } })
 
-  // delete user's posts
-  await Post.deleteMany({ _id: { $in: postIds } })
+      // decrease postCount for tags.
+      const allTagIds = authorPosts
+        .filter(p => p.status === "published" && p.tags.length > 0)
+        .flatMap(p => p.tags)
+      if (allTagIds.length > 0) {
+        const tagCounts = allTagIds.reduce((acc, tagId) => {
+          const key = tagId.toString()
+          acc[key] = (acc[key] ?? 0) + 1
+          return acc
+        }, {} as Record<string, number>)
+        await Tag.bulkWrite(
+          Object.entries(tagCounts).map(([tagId, count]) => ({
+            updateOne: {
+              filter: { _id: tagId },
+              update: { $inc: { postCount: -count } }
+            }
+          }))
+        )
+      }
 
-  // decrease likesCount on all posts that user previously liked
-  const likedPosts = await Like.find({ user: userId, post: { $nin: postIds } })
-    .select("post")
-    .lean()
-  const likedPostIds = likedPosts.map(l => l.post)
-  await Post.updateMany({ _id: { $in: likedPostIds } }, { $inc: { likesCount: -1 } })
+      // delete user's posts
+      await Post.deleteMany({ _id: { $in: postIds } })
 
-  // decrease likesCount on all comments that user previously liked
-  const likedComments = await Like.find({ user: userId, type: "comment" })
-    .select("comment")
-    .lean()
-  const likedCommentIds = likedComments.map(l => l.comment)
-  await Comment.updateMany({ _id: { $in: likedCommentIds } }, { $inc: { likesCount: -1 } })
+      const userLikes = await Like.find({ user: userId }).lean()
+      const likedPostIds = userLikes
+        .filter(l => l.type === "post" && !postIds.some(id => id.equals(l.post)))
+        .map(l => l.post)
+      const likedCommentIds = userLikes
+        .filter(l => l.type === "comment")
+        .map(l => l.comment)
 
-  // remove all likes that belongs to user 
-  await Like.deleteMany({ user: userId })
+      // decrease likesCount on all posts and comments that user previously liked
+      await Post.updateMany({ _id: { $in: likedPostIds } }, { $inc: { likesCount: -1 } })
+      await Comment.updateMany({ _id: { $in: likedCommentIds } }, { $inc: { likesCount: -1 } })
 
-  // decrease commentsCount on all posts that user previously replied
-  const comments = await Comment.find({ author: userId, post: { $nin: postIds } })
-    .select("post")
-    .lean()
-  const countPerPost = comments.reduce((acc, comment) => {
-    const postId = comment.post.toString()
-    acc[postId] = (acc[postId] ?? 0) + 1
-    return acc
-  }, {} as Record<string, number>)
-  if (Object.keys(countPerPost).length > 0) {
-    await Post.bulkWrite(
-      Object.entries(countPerPost).map(([postId, count]) => ({
-        updateOne: {
-          filter: { _id: postId },
-          update: { $inc: { commentsCount: -count } }
+      // remove all likes that belongs to user and user's posts 
+      await Like.deleteMany({ $or: [{ post: { $in: postIds } }, { user: userId }] })
+
+      // fetch all user's comments on other users' posts in one query
+      const userComments = await Comment.find({ post: { $nin: postIds }, author: userId })
+        .select("post parentComment")
+        .lean()
+      const userCommentIds = userComments.map(c => c._id)
+
+      if (userComments.length > 0) {
+        // decrease commentsCount on all posts that user commented on
+        const countPerPost = userComments.reduce((acc, comment) => {
+          const postId = comment.post.toString()
+          acc[postId] = (acc[postId] ?? 0) + 1
+          return acc
+        }, {} as Record<string, number>)
+        await Post.bulkWrite(
+          Object.entries(countPerPost).map(([postId, count]) => ({
+            updateOne: {
+              filter: { _id: postId },
+              update: { $inc: { commentsCount: -count } }
+            }
+          }))
+        )
+
+        // decrease repliesCount on parent comments that user replied to
+        const replies = userComments.filter(c => c.parentComment != null)
+        const countPerParent = replies.reduce((acc, reply) => {
+          const key = reply.parentComment!.toString()
+          acc[key] = (acc[key] ?? 0) + 1
+          return acc
+        }, {} as Record<string, number>)
+        if (Object.keys(countPerParent).length > 0) {
+          await Comment.bulkWrite(
+            Object.entries(countPerParent).map(([parentId, count]) => ({
+              updateOne: {
+                filter: { _id: parentId },
+                update: { $inc: { repliesCount: -count } }
+              }
+            }))
+          )
         }
-      }))
-    )
+
+        // handle orphaned replies from other users to this user's comments
+        const orphanedReplies = await Comment.find({ parentComment: { $in: userCommentIds } })
+          .select("post")
+          .lean()
+        if (orphanedReplies.length > 0) {
+          const orphanCountPerPost = orphanedReplies.reduce((acc, reply) => {
+            const postId = reply.post.toString()
+            acc[postId] = (acc[postId] ?? 0) + 1
+            return acc
+          }, {} as Record<string, number>)
+          await Post.bulkWrite(
+            Object.entries(orphanCountPerPost).map(([postId, count]) => ({
+              updateOne: {
+                filter: { _id: postId },
+                update: { $inc: { commentsCount: -count } }
+              }
+            }))
+          )
+        }
+        await Like.deleteMany({ comment: { $in: userCommentIds } })
+        await Comment.deleteMany({ parentComment: { $in: userCommentIds } })
+      }
+
+      // delete all comments that belongs to user
+      await Comment.deleteMany({ author: userId })
+
+      const follows = await Follow.find(
+        { $or: [{ follower: userId }, { following: userId }] }
+      ).lean()
+
+      const followerIds = follows
+        .filter(f => f.following.toString() === userId)
+        .map(f => f.follower)
+      const followingIds = follows
+        .filter(f => f.follower.toString() === userId)
+        .map(f => f.following)
+
+      // decrement followersCount and followingCount for all users who followed 
+      // or followed by deleted user
+      await User.bulkWrite([
+        ...followerIds.map(id => ({
+          updateOne: {
+            filter: { _id: id }, update: { $inc: { followingCount: -1 } }
+          }
+        })),
+        ...followingIds.map(id => ({
+          updateOne: {
+            filter: { _id: id }, update: { $inc: { followersCount: -1 } }
+          }
+        }))
+      ])
+
+      // remove all follower and following relationships of the deleted user
+      await Follow.deleteMany({ $or: [{ follower: userId }, { following: userId }] })
+
+      // delete user in the end
+      await User.deleteOne({ _id: userId })
+    })
+  } finally {
+    await session.endSession()
   }
-
-  // delete all comments that belongs to user
-  await Comment.deleteMany({ author: userId })
-
-  // decrement followingCount for all users who followed the deleted user
-  const followers = await Follow.find({ following: userId })
-    .select("follower")
-    .lean()
-  const followerIds = followers.map(f => f.follower)
-  await User.updateMany({ _id: { $in: followerIds } }, { $inc: { followingCount: -1 } })
-
-  // remove all followers of the deleted user
-  await Follow.deleteMany({ following: userId })
-
-  // decrement followersCount for all users who are followed by the deleted user                                              
-  const following = await Follow.find({ follower: userId })
-    .select("following")
-    .lean()
-  const followingIds = following.map(f => f.following)
-  await User.updateMany({ _id: { $in: followingIds } }, { $inc: { followersCount: -1 } })
-
-  // remove all following relationships of the deleted user
-  await Follow.deleteMany({ follower: userId })
-
-  // delete user in the end
-  await user.deleteOne()
 }
 
 const getLikedPosts = async (userId: string, page: number, limit: number) => {
@@ -216,45 +293,78 @@ const getPostsByUsername = async (
 }
 
 const followUser = async (userId: string, username: string): Promise<void> => {
-  const user = await User.findOne({ username: username })
-    .select("_id")
-    .lean()
-
-  if (!user) throw new NotFoundError("User not found")
-  if (user._id.toString() === userId)
-    throw new BadRequestError("Cannot follow yourself")
-
+  const session = await mongoose.startSession()
   try {
-    await Follow.create({ follower: userId, following: user._id })
-  } catch (error) {
-    if (error instanceof mongo.MongoServerError && error.code === 11000) {
-      throw new ConflictError("Already following this user")
-    }
-    throw error
+    await session.withTransaction(async () => {
+      const user = await User.findOne({ username: username })
+        .select("_id")
+        .lean()
+
+      if (!user) throw new NotFoundError("User not found")
+      if (user._id.toString() === userId)
+        throw new BadRequestError("Cannot follow yourself")
+
+      try {
+        await Follow.create({ follower: userId, following: user._id })
+      } catch (error) {
+        if (error instanceof mongo.MongoServerError && error.code === 11000) {
+          throw new ConflictError("Already following this user")
+        }
+        throw error
+      }
+
+      await User.bulkWrite([
+        {
+          updateOne: {
+            filter: { _id: userId },
+            update: { $inc: { followingCount: 1 } }
+          }
+        }, {
+          updateOne: {
+            filter: { _id: user._id },
+            update: { $inc: { followersCount: 1 } }
+          }
+        }
+      ])
+    })
+  } finally {
+    await session.endSession()
   }
-  await Promise.all([
-    User.findByIdAndUpdate(userId, { $inc: { followingCount: 1 } }),
-    User.findByIdAndUpdate(user._id, { $inc: { followersCount: 1 } })
-  ])
 }
 
 const unfollowUser = async (userId: string, username: string): Promise<void> => {
-  const user = await User.findOne({ username: username })
-    .select("_id")
-    .lean()
+  const session = await mongoose.startSession()
+  try {
+    await session.withTransaction(async () => {
+      const user = await User.findOne({ username: username })
+        .select("_id")
+        .lean()
 
-  if (!user) throw new NotFoundError("User not found")
-  if (user._id.toString() === userId)
-    throw new BadRequestError("Cannot unfollow yourself")
+      if (!user) throw new NotFoundError("User not found")
+      if (user._id.toString() === userId)
+        throw new BadRequestError("Cannot unfollow yourself")
 
-  const unfollow = await Follow.findOneAndDelete(
-    { follower: userId, following: user._id }
-  )
-  if (!unfollow) throw new BadRequestError("You are not following this user")
-  await Promise.all([
-    User.findByIdAndUpdate(userId, { $inc: { followingCount: -1 } }),
-    User.findByIdAndUpdate(user._id, { $inc: { followersCount: -1 } })
-  ])
+      const unfollow = await Follow.findOneAndDelete(
+        { follower: userId, following: user._id }
+      )
+      if (!unfollow) throw new BadRequestError("You are not following this user")
+      await User.bulkWrite([
+        {
+          updateOne: {
+            filter: { _id: userId },
+            update: { $inc: { followingCount: -1 } }
+          }
+        }, {
+          updateOne: {
+            filter: { _id: user._id },
+            update: { $inc: { followersCount: -1 } }
+          }
+        }
+      ])
+    })
+  } finally {
+    await session.endSession()
+  }
 }
 
 const getFollowersList = async (username: string, page: number, limit: number) => {
