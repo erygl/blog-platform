@@ -1,5 +1,6 @@
 import { Router } from "express";
 import authMiddleware from "../middleware/auth.js";
+import requireVerified from "../middleware/requireVerified.js";
 import {
   getMyProfile,
   updateProfile,
@@ -27,7 +28,7 @@ router.route("/me/password").patch(authMiddleware, updatePassword)
 router.route("/:username").get(getPublicProfile)
 router.route("/:username/posts").get(getPostsByUsername)
 router.route("/:username/follow")
-  .post(authMiddleware, followUser)
+  .post(authMiddleware, requireVerified, followUser)
   .delete(authMiddleware, unfollowUser)
 router.route("/:username/followers").get(authMiddleware, getFollowersList)
 router.route("/:username/following").get(authMiddleware, getFollowingList)

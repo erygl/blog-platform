@@ -1,5 +1,6 @@
 import { Router } from "express";
 import authMiddleware from "../middleware/auth.js";
+import requireVerified from "../middleware/requireVerified.js";
 import {
   getPostComments,
   addComment,
@@ -16,17 +17,17 @@ const router = Router()
 
 router.route("/:postSlug/comments")
   .get(getPostComments)
-  .post(authMiddleware, addComment)
+  .post(authMiddleware, requireVerified, addComment)
 router.route("/:postSlug/comments/:commentId")
-  .patch(authMiddleware, editComment)
+  .patch(authMiddleware, requireVerified, editComment)
   .delete(authMiddleware, deleteComment)
 router.route("/:postSlug/comments/:commentId/like")
-  .post(authMiddleware, likeComment)
-  .delete(authMiddleware, unlikeComment)
+  .post(authMiddleware, requireVerified, likeComment)
+  .delete(authMiddleware, requireVerified, unlikeComment)
 router.route("/:postSlug/comments/:commentId/likes")
   .get(authMiddleware, getCommentLikes)
 router.route("/:postSlug/comments/:commentId/replies")
   .get(getCommentReplies)
-  .post(authMiddleware, addReply)
+  .post(authMiddleware, requireVerified, addReply)
   
 export default router

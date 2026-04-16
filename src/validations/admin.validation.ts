@@ -40,13 +40,14 @@ export const getTagsSchema = z.object({
   limit: z.coerce.number().positive().lte(50).default(10)
 })
 
-export const createTagSchema = z.object({
-  name: z.string().min(1, "Name is required").max(50, "Name must be less than 50 characters").trim()
-})
+const tagNameSchema = z.string()
+  .min(1, "Name is required")
+  .max(50, "Name must be less than 50 characters")
+  .transform(v => v.replace(/\s+/g, " ").trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase()))
 
-export const updateTagSchema = z.object({
-  name: z.string().min(1, "Name is required").max(50, "Name must be less than 50 characters").trim()
-})
+export const createTagSchema = z.object({ name: tagNameSchema })
+
+export const updateTagSchema = z.object({ name: tagNameSchema })
 
 export const getStatsSchema = z.object({
   startDate: z.coerce.date().optional(),

@@ -7,23 +7,27 @@ import Like from "../models/Like.js";
 import mongoose, { mongo } from "mongoose";
 import Follow from "../models/Follow.js";
 
+const normalizeTagName = (name: string) =>
+  name.replace(/\s+/g, " ").trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+
 const resolveTagIds = async (tagNames: string[]) => {
   if (tagNames.length === 0) return []
+  const normalized = tagNames.map(normalizeTagName)
   await Tag.bulkWrite(
-    tagNames.map(name => ({
+    normalized.map(name => ({
       updateOne: {
-        filter: { name: name },
+        filter: { name },
         update: { $setOnInsert: { name, slug: generateSlug(name) } },
         upsert: true
       }
     }))
   )
 
-  const tags = await Tag.find({ name: { $in: tagNames } })
+  const tags = await Tag.find({ name: { $in: normalized } })
     .select("_id name")
     .lean()
 
-  return tagNames.map(name => tags.find(t => t.name === name)!._id)
+  return normalized.map(name => tags.find(t => t.name === name)!._id)
 }
 
 const getTrendingPosts = async (page: number, limit: number) => {
