@@ -25,7 +25,7 @@ describe("GET /api/tags/:tagSlug", () => {
 
     const res = await request(app).get("/api/tags/typescript")
     expect(res.status).toBe(200)
-    expect(res.body.tag.name).toBe("typescript")
+    expect(res.body.tag.name).toBe("Typescript")
     expect(res.body.tag.postCount).toBe(1)
     expect(res.body.posts).toHaveLength(1)
     expect(res.body.posts[0]).toHaveProperty("title")

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 import Comment from "../../../src/models/Comment.js"
 import Like from "../../../src/models/Like.js"
@@ -36,12 +36,7 @@ describe("DELETE /api/posts/:postSlug", () => {
     const post = await createPost(accessToken)
     const dbPost = await Post.findOne({ slug: post.slug })
 
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
+    await registerSecondUser()
     await request(app).post("/api/auth/register").send({
       username: "bob",
       name: "Bob Smith",
@@ -66,12 +61,7 @@ describe("DELETE /api/posts/:postSlug", () => {
     const post = await createPost(accessToken)
     const dbPost = await Post.findOne({ slug: post.slug })
 
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
+    await registerSecondUser()
     const jane = await User.findOne({ username: "jane" })
     await Like.create({ user: jane!._id, post: dbPost!._id, type: "post" })
 
@@ -97,17 +87,9 @@ describe("DELETE /api/posts/:postSlug", () => {
   })
 
   it("should return 404 if user does not own the post", async () => {
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janePost = await createPost(janeLogin.body.accessToken)
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    const janePost = await createPost(janeLogin.accessToken)
 
     const res = await request(app)
       .delete(`/api/posts/${janePost.slug}`)

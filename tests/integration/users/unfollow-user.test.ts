@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser } from "../../helpers/auth.helper.js"
 import User from "../../../src/models/User.js"
 
 vi.mock("../../../src/utils/email.js", () => ({
@@ -13,12 +13,7 @@ beforeEach(async () => {
   const res = await loginUser()
   accessToken = res.accessToken
 
-  await request(app).post("/api/auth/register").send({
-    username: "jane",
-    name: "Jane Doe",
-    email: "jane@example.com",
-    password: "Password1"
-  })
+  await registerSecondUser()
 })
 
 afterEach(async () => {

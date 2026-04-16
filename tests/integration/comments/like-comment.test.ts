@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 import { createComment, createReply } from "../../helpers/comment.helper.js"
 import Comment from "../../../src/models/Comment.js"
@@ -22,17 +22,9 @@ beforeEach(async () => {
   const comment = await createComment(accessToken, postSlug)
   commentId = comment._id
 
-  await request(app).post("/api/auth/register").send({
-    username: "jane",
-    name: "Jane Doe",
-    email: "jane@example.com",
-    password: "Password1"
-  })
-  const janeLogin = await request(app).post("/api/auth/login").send({
-    email: "jane@example.com",
-    password: "Password1"
-  })
-  readerToken = janeLogin.body.accessToken
+  await registerSecondUser()
+  const janeLogin = await loginSecondUser()
+  readerToken = janeLogin.accessToken
 })
 
 afterEach(async () => {

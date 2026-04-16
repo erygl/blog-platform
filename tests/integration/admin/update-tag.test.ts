@@ -20,29 +20,39 @@ afterEach(async () => {
 })
 
 describe("PATCH /api/admin/tags/:tagId", () => {
-  it("should update tag name and slug", async () => {
-    const tag = await Tag.create({ name: "JavaScript", slug: "javascript" })
+  it("should update tag with normalized name and slug", async () => {
+    const tag = await Tag.create({ name: "Javascript", slug: "javascript" })
     const res = await request(app)
       .patch(`/api/admin/tags/${tag._id}`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ name: "Node JS" })
+      .send({ name: "node js" })
     expect(res.status).toBe(200)
-    expect(res.body.tag.name).toBe("Node JS")
+    expect(res.body.tag.name).toBe("Node Js")
     expect(res.body.tag.slug).toBe("node-js")
   })
 
-  it("should return 409 if new name conflicts with an existing tag", async () => {
-    await Tag.create({ name: "JavaScript", slug: "javascript" })
-    const tag = await Tag.create({ name: "TypeScript", slug: "typescript" })
+  it("should normalize mixed case on update", async () => {
+    const tag = await Tag.create({ name: "Javascript", slug: "javascript" })
     const res = await request(app)
       .patch(`/api/admin/tags/${tag._id}`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ name: "JavaScript" })
+      .send({ name: "TyPeScRiPt" })
+    expect(res.status).toBe(200)
+    expect(res.body.tag.name).toBe("Typescript")
+  })
+
+  it("should return 409 if normalized name conflicts with an existing tag", async () => {
+    await Tag.create({ name: "Javascript", slug: "javascript" })
+    const tag = await Tag.create({ name: "Typescript", slug: "typescript" })
+    const res = await request(app)
+      .patch(`/api/admin/tags/${tag._id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "JaVaScRiPt" })
     expect(res.status).toBe(409)
   })
 
   it("should return 400 if name is missing", async () => {
-    const tag = await Tag.create({ name: "JavaScript", slug: "javascript" })
+    const tag = await Tag.create({ name: "Javascript", slug: "javascript" })
     const res = await request(app)
       .patch(`/api/admin/tags/${tag._id}`)
       .set("Authorization", `Bearer ${adminToken}`)
@@ -51,7 +61,7 @@ describe("PATCH /api/admin/tags/:tagId", () => {
   })
 
   it("should return 400 if name is empty string", async () => {
-    const tag = await Tag.create({ name: "JavaScript", slug: "javascript" })
+    const tag = await Tag.create({ name: "Javascript", slug: "javascript" })
     const res = await request(app)
       .patch(`/api/admin/tags/${tag._id}`)
       .set("Authorization", `Bearer ${adminToken}`)
@@ -68,7 +78,7 @@ describe("PATCH /api/admin/tags/:tagId", () => {
   })
 
   it("should return 401 if no auth token", async () => {
-    const tag = await Tag.create({ name: "JavaScript", slug: "javascript" })
+    const tag = await Tag.create({ name: "Javascript", slug: "javascript" })
     const res = await request(app)
       .patch(`/api/admin/tags/${tag._id}`)
       .send({ name: "New Name" })

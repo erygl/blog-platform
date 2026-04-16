@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { registerAdmin, loginAdmin } from "../../helpers/admin.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 
@@ -53,17 +53,9 @@ describe("GET /api/admin/posts", () => {
 
   it("should filter by author username and exclude posts from other authors", async () => {
     await createPost(userToken)
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    await createPost(janeLogin.body.accessToken, { title: "Jane Post Title Here Long" })
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    await createPost(janeLogin.accessToken, { title: "Jane Post Title Here Long" })
 
     const res = await request(app)
       .get("/api/admin/posts?author=john")

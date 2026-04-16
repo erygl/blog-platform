@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 import User from "../../../src/models/User.js"
 import Follow from "../../../src/models/Follow.js"
@@ -37,17 +37,9 @@ describe("GET /api/posts/feed", () => {
   })
 
   it("should return posts from followed users", async () => {
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    await createPost(janeLogin.body.accessToken)
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    await createPost(janeLogin.accessToken)
 
     const john = await User.findOne({ username: "john" })
     const jane = await User.findOne({ username: "jane" })
@@ -63,17 +55,9 @@ describe("GET /api/posts/feed", () => {
   })
 
   it("should not return posts from users not followed", async () => {
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    await createPost(janeLogin.body.accessToken)
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    await createPost(janeLogin.accessToken)
 
     const res = await request(app)
       .get("/api/posts/feed")
@@ -83,17 +67,9 @@ describe("GET /api/posts/feed", () => {
   })
 
   it("should respect limit and return hasMore", async () => {
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeToken = janeLogin.body.accessToken
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    const janeToken = janeLogin.accessToken
     await createPost(janeToken)
     await createPost(janeToken)
     await createPost(janeToken)
@@ -111,17 +87,9 @@ describe("GET /api/posts/feed", () => {
   })
 
   it("should not return drafts from followed users", async () => {
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    await createPost(janeLogin.body.accessToken, { status: "draft" })
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    await createPost(janeLogin.accessToken, { status: "draft" })
 
     const john = await User.findOne({ username: "john" })
     const jane = await User.findOne({ username: "jane" })

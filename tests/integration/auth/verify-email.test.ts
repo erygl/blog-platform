@@ -17,7 +17,7 @@ afterEach(async () => {
 
 describe("GET api/auth/verify-email", () => {
   it("should verify email successfully", async () => {
-    await registerUser()
+    await registerUser(false)
     const res = await request(app)
       .get(`/api/auth/verify-email?token=${capturedToken}`)
     expect(res.status).toBe(200)
@@ -30,7 +30,7 @@ describe("GET api/auth/verify-email", () => {
   })
 
   it("should return 400, if user already verified", async () => {
-    await registerUser()
+    await registerUser(false)
     await request(app)
       .get(`/api/auth/verify-email?token=${capturedToken}`)
     const res = await request(app)

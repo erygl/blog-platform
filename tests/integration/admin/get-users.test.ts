@@ -49,7 +49,7 @@ describe("GET /api/admin/users", () => {
   })
 
   it("should filter by isVerified and exclude non-matching users", async () => {
-    await registerUser()
+    await registerUser(false)
     await User.findOneAndUpdate({ email: "admin@example.com" }, { isVerified: true })
     const res = await request(app)
       .get("/api/admin/users?isVerified=false")

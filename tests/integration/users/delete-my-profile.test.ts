@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 import User from "../../../src/models/User.js"
 import Post from "../../../src/models/Post.js"
@@ -52,12 +52,7 @@ describe("DELETE /api/users/me", () => {
     const post = await createPost(accessToken)
     const dbPost = await Post.findOne({ slug: post.slug })
 
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
+    await registerSecondUser()
     const jane = await User.findOne({ username: "jane" })
     await Like.create({ user: jane!._id, post: dbPost!._id, type: "post" })
     await Comment.create({ post: dbPost!._id, author: jane!._id, content: "Jane's comment" })
@@ -74,17 +69,9 @@ describe("DELETE /api/users/me", () => {
   })
 
   it("should decrement likesCount on posts the user had liked", async () => {
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janePost = await createPost(janeLogin.body.accessToken)
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    const janePost = await createPost(janeLogin.accessToken)
 
     await request(app)
       .post(`/api/posts/${janePost.slug}/like`)
@@ -102,17 +89,9 @@ describe("DELETE /api/users/me", () => {
   })
 
   it("should delete the user's comments and decrement commentsCount on posts", async () => {
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janePost = await createPost(janeLogin.body.accessToken)
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    const janePost = await createPost(janeLogin.accessToken)
     const dbPost = await Post.findOne({ slug: janePost.slug })
     const john = await User.findOne({ username: "john" })
 
@@ -131,12 +110,7 @@ describe("DELETE /api/users/me", () => {
   })
 
   it("should update follow counts when a followed/following user is deleted", async () => {
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
+    await registerSecondUser()
 
     // john follows jane
     await request(app)

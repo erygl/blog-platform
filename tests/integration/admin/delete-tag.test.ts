@@ -27,7 +27,7 @@ afterEach(async () => {
 
 describe("DELETE /api/admin/tags/:tagId", () => {
   it("should delete tag and return 204", async () => {
-    const tag = await Tag.create({ name: "JavaScript", slug: "javascript" })
+    const tag = await Tag.create({ name: "Javascript", slug: "javascript" })
     const res = await request(app)
       .delete(`/api/admin/tags/${tag._id}`)
       .set("Authorization", `Bearer ${adminToken}`)
@@ -37,8 +37,8 @@ describe("DELETE /api/admin/tags/:tagId", () => {
   })
 
   it("should remove deleted tag from posts that referenced it", async () => {
-    const tag = await Tag.create({ name: "JavaScript", slug: "javascript" })
-    const post = await createPost(userToken, { tags: ["JavaScript"] })
+    const tag = await Tag.create({ name: "Javascript", slug: "javascript" })
+    const post = await createPost(userToken, { tags: ["Javascript"] })
     const dbPost = await Post.findOne({ slug: post.slug })
     expect(dbPost!.tags.map(t => t.toString())).toContain(tag._id.toString())
 
@@ -51,9 +51,9 @@ describe("DELETE /api/admin/tags/:tagId", () => {
   })
 
   it("should only remove the deleted tag and leave other tags on the post", async () => {
-    const tag1 = await Tag.create({ name: "JavaScript", slug: "javascript" })
-    const tag2 = await Tag.create({ name: "TypeScript", slug: "typescript" })
-    const post = await createPost(userToken, { tags: ["JavaScript", "TypeScript"] })
+    const tag1 = await Tag.create({ name: "Javascript", slug: "javascript" })
+    const tag2 = await Tag.create({ name: "Typescript", slug: "typescript" })
+    const post = await createPost(userToken, { tags: ["Javascript", "Typescript"] })
     const dbPost = await Post.findOne({ slug: post.slug })
     expect(dbPost!.tags).toHaveLength(2)
 
@@ -74,7 +74,7 @@ describe("DELETE /api/admin/tags/:tagId", () => {
   })
 
   it("should return 401 if no auth token", async () => {
-    const tag = await Tag.create({ name: "JavaScript", slug: "javascript" })
+    const tag = await Tag.create({ name: "Javascript", slug: "javascript" })
     const res = await request(app).delete(`/api/admin/tags/${tag._id}`)
     expect(res.status).toBe(401)
   })

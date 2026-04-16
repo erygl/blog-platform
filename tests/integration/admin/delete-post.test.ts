@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
+import User from "../../../src/models/User.js"
 import { registerAdmin, loginAdmin } from "../../helpers/admin.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 import { createComment } from "../../helpers/comment.helper.js"
@@ -44,17 +45,16 @@ describe("DELETE /api/admin/posts/:postId", () => {
     const post = await createPost(userToken)
     const dbPost = await Post.findOne({ slug: post.slug })
 
-    await request(app).post("/api/auth/register").send({
-      username: "jane", name: "Jane Doe", email: "jane@example.com", password: "Password1"
-    })
+    await registerSecondUser()
     await request(app).post("/api/auth/register").send({
       username: "bob", name: "Bob Smith", email: "bob@example.com", password: "Password1"
     })
-    const janeLogin = await request(app).post("/api/auth/login").send({ email: "jane@example.com", password: "Password1" })
+    await User.updateOne({ email: "bob@example.com" }, { isVerified: true })
+    const janeLogin = await loginSecondUser()
     const bobLogin = await request(app).post("/api/auth/login").send({ email: "bob@example.com", password: "Password1" })
 
     await createComment(userToken, post.slug)
-    await createComment(janeLogin.body.accessToken, post.slug)
+    await createComment(janeLogin.accessToken, post.slug)
     await createComment(bobLogin.body.accessToken, post.slug)
 
     await request(app)
@@ -69,17 +69,16 @@ describe("DELETE /api/admin/posts/:postId", () => {
     const post = await createPost(userToken)
     const dbPost = await Post.findOne({ slug: post.slug })
 
-    await request(app).post("/api/auth/register").send({
-      username: "jane", name: "Jane Doe", email: "jane@example.com", password: "Password1"
-    })
+    await registerSecondUser()
     await request(app).post("/api/auth/register").send({
       username: "bob", name: "Bob Smith", email: "bob@example.com", password: "Password1"
     })
-    const janeLogin = await request(app).post("/api/auth/login").send({ email: "jane@example.com", password: "Password1" })
+    await User.updateOne({ email: "bob@example.com" }, { isVerified: true })
+    const janeLogin = await loginSecondUser()
     const bobLogin = await request(app).post("/api/auth/login").send({ email: "bob@example.com", password: "Password1" })
 
     await request(app).post(`/api/posts/${post.slug}/like`).set("Authorization", `Bearer ${userToken}`)
-    await request(app).post(`/api/posts/${post.slug}/like`).set("Authorization", `Bearer ${janeLogin.body.accessToken}`)
+    await request(app).post(`/api/posts/${post.slug}/like`).set("Authorization", `Bearer ${janeLogin.accessToken}`)
     await request(app).post(`/api/posts/${post.slug}/like`).set("Authorization", `Bearer ${bobLogin.body.accessToken}`)
 
     await request(app)
@@ -91,8 +90,8 @@ describe("DELETE /api/admin/posts/:postId", () => {
   })
 
   it("should decrement tag postCount when a published post is deleted", async () => {
-    const tag = await Tag.create({ name: "TestTag", slug: "testtag", postCount: 0 })
-    const post = await createPost(userToken, { tags: ["TestTag"] })
+    const tag = await Tag.create({ name: "Javascript", slug: "javascript", postCount: 0 })
+    const post = await createPost(userToken, { tags: ["Javascript"] })
     const dbPost = await Post.findOne({ slug: post.slug })
     const tagBefore = await Tag.findById(tag._id)
     expect(tagBefore!.postCount).toBe(1)

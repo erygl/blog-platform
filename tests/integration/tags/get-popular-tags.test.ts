@@ -37,11 +37,11 @@ describe("GET /api/tags", () => {
     const res = await request(app).get("/api/tags")
     expect(res.status).toBe(200)
     expect(res.body.tags).toHaveLength(3)
-    expect(res.body.tags[0].name).toBe("typescript")
+    expect(res.body.tags[0].name).toBe("Typescript")
     expect(res.body.tags[0].postCount).toBe(3)
-    expect(res.body.tags[1].name).toBe("node")
+    expect(res.body.tags[1].name).toBe("Node")
     expect(res.body.tags[1].postCount).toBe(2)
-    expect(res.body.tags[2].name).toBe("react")
+    expect(res.body.tags[2].name).toBe("React")
     expect(res.body.tags[2].postCount).toBe(1)
   })
 
@@ -52,7 +52,7 @@ describe("GET /api/tags", () => {
     const res = await request(app).get("/api/tags")
     expect(res.status).toBe(200)
     expect(res.body.tags).toHaveLength(1)
-    expect(res.body.tags[0].name).toBe("active")
+    expect(res.body.tags[0].name).toBe("Active")
   })
 
   it("should respect limit query param", async () => {

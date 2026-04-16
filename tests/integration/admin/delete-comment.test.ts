@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
+import User from "../../../src/models/User.js"
 import { registerAdmin, loginAdmin } from "../../helpers/admin.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 import { createComment, createReply } from "../../helpers/comment.helper.js"
@@ -43,16 +44,15 @@ describe("DELETE /api/admin/comments/:commentId", () => {
     const post = await createPost(userToken)
     const comment = await createComment(userToken, post.slug)
 
-    await request(app).post("/api/auth/register").send({
-      username: "jane", name: "Jane Doe", email: "jane@example.com", password: "Password1"
-    })
+    await registerSecondUser()
     await request(app).post("/api/auth/register").send({
       username: "bob", name: "Bob Smith", email: "bob@example.com", password: "Password1"
     })
-    const janeLogin = await request(app).post("/api/auth/login").send({ email: "jane@example.com", password: "Password1" })
+    await User.updateOne({ email: "bob@example.com" }, { isVerified: true })
+    const janeLogin = await loginSecondUser()
     const bobLogin = await request(app).post("/api/auth/login").send({ email: "bob@example.com", password: "Password1" })
 
-    await createReply(janeLogin.body.accessToken, post.slug, comment._id)
+    await createReply(janeLogin.accessToken, post.slug, comment._id)
     await createReply(bobLogin.body.accessToken, post.slug, comment._id)
 
     await request(app)
@@ -67,18 +67,16 @@ describe("DELETE /api/admin/comments/:commentId", () => {
     const post = await createPost(userToken)
     const comment = await createComment(userToken, post.slug)
 
-    await request(app).post("/api/auth/register").send({
-      username: "jane", name: "Jane Doe", email: "jane@example.com", password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({ email: "jane@example.com", password: "Password1" })
-    const reply = await createReply(janeLogin.body.accessToken, post.slug, comment._id)
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    const reply = await createReply(janeLogin.accessToken, post.slug, comment._id)
 
     await request(app)
       .post(`/api/posts/${post.slug}/comments/${comment._id}/like`)
       .set("Authorization", `Bearer ${userToken}`)
     await request(app)
       .post(`/api/posts/${post.slug}/comments/${comment._id}/like`)
-      .set("Authorization", `Bearer ${janeLogin.body.accessToken}`)
+      .set("Authorization", `Bearer ${janeLogin.accessToken}`)
     await request(app)
       .post(`/api/posts/${post.slug}/comments/${reply._id}/like`)
       .set("Authorization", `Bearer ${userToken}`)
@@ -97,12 +95,10 @@ describe("DELETE /api/admin/comments/:commentId", () => {
     const post = await createPost(userToken)
     const comment = await createComment(userToken, post.slug)
 
-    await request(app).post("/api/auth/register").send({
-      username: "jane", name: "Jane Doe", email: "jane@example.com", password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({ email: "jane@example.com", password: "Password1" })
-    await createReply(janeLogin.body.accessToken, post.slug, comment._id)
-    await createReply(janeLogin.body.accessToken, post.slug, comment._id)
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    await createReply(janeLogin.accessToken, post.slug, comment._id)
+    await createReply(janeLogin.accessToken, post.slug, comment._id)
 
     const dbPost = await Post.findOne({ slug: post.slug })
     expect(dbPost!.commentsCount).toBe(3)
@@ -119,11 +115,9 @@ describe("DELETE /api/admin/comments/:commentId", () => {
     const post = await createPost(userToken)
     const comment = await createComment(userToken, post.slug)
 
-    await request(app).post("/api/auth/register").send({
-      username: "jane", name: "Jane Doe", email: "jane@example.com", password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({ email: "jane@example.com", password: "Password1" })
-    const reply = await createReply(janeLogin.body.accessToken, post.slug, comment._id)
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    const reply = await createReply(janeLogin.accessToken, post.slug, comment._id)
 
     const parentBefore = await Comment.findById(comment._id)
     expect(parentBefore!.repliesCount).toBe(1)

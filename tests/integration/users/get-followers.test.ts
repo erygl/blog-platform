@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser } from "../../helpers/auth.helper.js"
+import User from "../../../src/models/User.js"
 
 vi.mock("../../../src/utils/email.js", () => ({
   sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
@@ -12,12 +13,7 @@ beforeEach(async () => {
   const res = await loginUser()
   accessToken = res.accessToken
 
-  await request(app).post("/api/auth/register").send({
-    username: "jane",
-    name: "Jane Doe",
-    email: "jane@example.com",
-    password: "Password1"
-  })
+  await registerSecondUser()
 })
 
 afterEach(async () => {
@@ -57,7 +53,8 @@ describe("GET /api/users/:username/followers", () => {
       { username: "user2", name: "User Two", email: "user2@example.com" },
       { username: "user3", name: "User Three", email: "user3@example.com" },
     ]) {
-      const reg = await request(app).post("/api/auth/register").send({ ...user, password: "Password1" })
+      await request(app).post("/api/auth/register").send({ ...user, password: "Password1" })
+      await User.updateOne({ email: user.email }, { isVerified: true })
       const login = await request(app).post("/api/auth/login").send({ email: user.email, password: "Password1" })
       await request(app)
         .post("/api/users/jane/follow")

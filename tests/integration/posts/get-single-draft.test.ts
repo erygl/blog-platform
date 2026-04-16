@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 
 vi.mock("../../../src/utils/email.js", () => ({
@@ -42,17 +42,9 @@ describe("GET /api/posts/me/drafts/:postSlug", () => {
   })
 
   it("should return 404 for another user's draft", async () => {
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeDraft = await createPost(janeLogin.body.accessToken, { status: "draft" })
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    const janeDraft = await createPost(janeLogin.accessToken, { status: "draft" })
 
     const res = await request(app)
       .get(`/api/posts/me/drafts/${janeDraft.slug}`)

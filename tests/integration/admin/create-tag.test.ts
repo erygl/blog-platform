@@ -20,17 +20,44 @@ afterEach(async () => {
 })
 
 describe("POST /api/admin/tags", () => {
-  it("should create tag and return 201 with tag object", async () => {
+  it("should create tag and return 201 with normalized name", async () => {
     const res = await request(app)
       .post("/api/admin/tags")
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ name: "JavaScript" })
+      .send({ name: "javascript" })
     expect(res.status).toBe(201)
-    expect(res.body.tag).toHaveProperty("name", "JavaScript")
+    expect(res.body.tag.name).toBe("Javascript")
     expect(res.body.tag).toHaveProperty("slug")
   })
 
-  it("should generate slug from name", async () => {
+  it("should normalize mixed case to title case", async () => {
+    const res = await request(app)
+      .post("/api/admin/tags")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "JaVaScRiPt" })
+    expect(res.status).toBe(201)
+    expect(res.body.tag.name).toBe("Javascript")
+  })
+
+  it("should normalize multiple internal spaces", async () => {
+    const res = await request(app)
+      .post("/api/admin/tags")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "node    js" })
+    expect(res.status).toBe(201)
+    expect(res.body.tag.name).toBe("Node Js")
+  })
+
+  it("should normalize leading and trailing spaces", async () => {
+    const res = await request(app)
+      .post("/api/admin/tags")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "  javascript  " })
+    expect(res.status).toBe(201)
+    expect(res.body.tag.name).toBe("Javascript")
+  })
+
+  it("should generate slug from normalized name", async () => {
     const res = await request(app)
       .post("/api/admin/tags")
       .set("Authorization", `Bearer ${adminToken}`)
@@ -39,12 +66,12 @@ describe("POST /api/admin/tags", () => {
     expect(res.body.tag.slug).toBe("node-js")
   })
 
-  it("should return 409 if tag name already exists", async () => {
-    await Tag.create({ name: "JavaScript", slug: "javascript" })
+  it("should return 409 if normalized name conflicts with existing tag", async () => {
+    await Tag.create({ name: "Javascript", slug: "javascript" })
     const res = await request(app)
       .post("/api/admin/tags")
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ name: "JavaScript" })
+      .send({ name: "JaVaScRiPt" })
     expect(res.status).toBe(409)
   })
 
@@ -67,7 +94,7 @@ describe("POST /api/admin/tags", () => {
   it("should return 401 if no auth token", async () => {
     const res = await request(app)
       .post("/api/admin/tags")
-      .send({ name: "JavaScript" })
+      .send({ name: "javascript" })
     expect(res.status).toBe(401)
   })
 })

@@ -5,7 +5,7 @@ import { UnauthorizedError } from "../../src/errors/index.js"
 
 describe("accessToken", () => {
   it("should decode token and return the payload", () => {
-    const payload = { userId: "123", userRole: "user" as const }
+    const payload = { userId: "123", userRole: "user" as const, isVerified: true, isBanned: false }
     const token = createAccessToken(payload)
     const decoded = verifyAccessToken(token)
 

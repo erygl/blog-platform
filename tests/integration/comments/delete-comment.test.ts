@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 import { createComment, createReply } from "../../helpers/comment.helper.js"
 import Post from "../../../src/models/Post.js"
@@ -93,20 +93,12 @@ describe("DELETE /api/posts/:postSlug/comments/:commentId", () => {
   it("should return 404 if user does not own the comment", async () => {
     const comment = await createComment(accessToken, postSlug)
 
-    await request(app).post("/api/auth/register").send({
-      username: "jane",
-      name: "Jane Doe",
-      email: "jane@example.com",
-      password: "Password1"
-    })
-    const janeLogin = await request(app).post("/api/auth/login").send({
-      email: "jane@example.com",
-      password: "Password1"
-    })
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
 
     const res = await request(app)
       .delete(`/api/posts/${postSlug}/comments/${comment._id}`)
-      .set("Authorization", `Bearer ${janeLogin.body.accessToken}`)
+      .set("Authorization", `Bearer ${janeLogin.accessToken}`)
     expect(res.status).toBe(404)
   })
 })
