@@ -5,7 +5,8 @@ import { UnauthorizedError } from "../errors/index.js"
 export interface AccessTokenPayload {
   userId: string,
   userRole: "user" | "admin",
-  isVerified: boolean
+  isVerified: boolean,
+  isBanned: boolean
 }
 
 const createAccessToken = (payload: AccessTokenPayload): string => {

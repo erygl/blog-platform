@@ -11,6 +11,7 @@ interface IUser {
   isVerified: boolean,
   followersCount: number,
   followingCount: number,
+  isBanned: boolean,
   refreshToken: string | null,
   passwordResetToken: string | null,
   passwordResetTokenExpiry: Date | null
@@ -70,6 +71,10 @@ const userSchema = new Schema<IUser>({
   followingCount: {
     type: Number,
     default: 0
+  },
+  isBanned: {
+    type: Boolean,
+    default: false
   },
   refreshToken: {
     type: String,

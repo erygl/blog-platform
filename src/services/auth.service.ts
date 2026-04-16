@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs"
 import User from "../models/User.js"
 import {
   BadRequestError,
+  ForbiddenError,
   UnauthorizedError
 } from "../errors/index.js"
 import {
@@ -50,10 +51,13 @@ const loginUser = async (email: string, password: string) => {
     throw new UnauthorizedError("Wrong credentials")
   }
 
+  if (user.isBanned) throw new ForbiddenError("Your account has been suspended")
+
   const accessToken = createAccessToken({
     userId: user._id.toString(),
     userRole: user.role,
-    isVerified: user.isVerified
+    isVerified: user.isVerified,
+    isBanned: user.isBanned
   })
 
   const refreshToken = createRefreshToken(user._id.toString())
@@ -125,11 +129,13 @@ const refreshAccessToken = async (refreshToken: string) => {
 
   const isValid = await bcrypt.compare(refreshToken, user.refreshToken)
   if (!isValid) throw new UnauthorizedError("Invalid refresh token")
+  if (user.isBanned) throw new ForbiddenError("Your account has been suspended")
 
   const newAccessToken = createAccessToken({
     userId: user._id.toString(),
     userRole: user.role,
-    isVerified: user.isVerified
+    isVerified: user.isVerified,
+    isBanned: user.isBanned
   })
 
   return newAccessToken

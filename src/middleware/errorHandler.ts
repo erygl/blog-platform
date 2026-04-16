@@ -1,5 +1,5 @@
 import { AppError } from "../errors/index.js";
-import { mongo } from "mongoose";
+import { mongo, Error as MongooseError } from "mongoose";
 import { ZodError } from "zod";
 import type { Request, Response, NextFunction } from "express";
 
@@ -19,6 +19,10 @@ export const errorHandler = (
   else if (err instanceof AppError) {
     statusCode = err.statusCode
     message = err.message
+  }
+  else if (err instanceof MongooseError.CastError) {
+    statusCode = 400
+    message = "Invalid ID format"
   }
   else if (err instanceof mongo.MongoServerError && err.code === 11000) {
     const field = Object.keys(err.keyValue)[0]

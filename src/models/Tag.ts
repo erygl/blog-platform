@@ -22,7 +22,7 @@ const TagSchema = new Schema<ITag>({
     type: Number,
     default: 0
   }
-}, { versionKey: false })
+}, { versionKey: false, timestamps: true })
 
 const Tag = model<ITag>("Tag", TagSchema)
 
