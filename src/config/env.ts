@@ -13,5 +13,10 @@ export const env = {
   refreshTokenSecret: getEnv("REFRESH_TOKEN_SECRET"),
   verificationTokenSecret: getEnv("VERIFICATION_TOKEN_SECRET"),
   resendApiKey: getEnv("RESEND_API_KEY"),
-  appUrl: getEnv("APP_URL")
+  appUrl: getEnv("APP_URL"),
+  r2AccountId: getEnv("R2_ACCOUNT_ID"),
+  r2AccessKeyId: getEnv("R2_ACCESS_KEY_ID"),
+  r2SecretAccessKey: getEnv("R2_SECRET_ACCESS_KEY"),
+  r2BucketName: getEnv("R2_BUCKET_NAME"),
+  r2PublicUrl: getEnv("R2_PUBLIC_URL"),
 }
