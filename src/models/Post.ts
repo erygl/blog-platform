@@ -13,7 +13,8 @@ interface IPost {
   likesCount: number,
   commentsCount: number,
   trendingScore: number,
-  publishedAt: Date | null
+  publishedAt: Date | null,
+  lastActivityAt: Date | null
 }
 
 const PostSchema = new Schema<IPost>({
@@ -80,8 +81,15 @@ const PostSchema = new Schema<IPost>({
   publishedAt: {
     type: Date,
     default: null
+  },
+  lastActivityAt: {
+    type: Date,
+    default: null
   }
 }, { timestamps: true, versionKey: false })
+
+PostSchema.index({ status: 1, lastActivityAt: -1 })
+PostSchema.index({ trendingScore: -1 })
 
 const Post = model<IPost>("Post", PostSchema)
 

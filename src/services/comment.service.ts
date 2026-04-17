@@ -38,7 +38,7 @@ const addComment = async (content: string, userId: string, postSlug: string) => 
         content: content
       })
 
-      await Post.findByIdAndUpdate(commentedPost._id, { $inc: { commentsCount: 1 } })
+      await Post.findByIdAndUpdate(commentedPost._id, { $inc: { commentsCount: 1 }, $set: { lastActivityAt: new Date() } })
       const { post, author, ...rest } = comment.toObject()
       return rest
     })
@@ -255,7 +255,7 @@ const addReply = async (
       })
 
       await Comment.findByIdAndUpdate(comment._id, { $inc: { repliesCount: 1 } })
-      await Post.findByIdAndUpdate(comment.post, { $inc: { commentsCount: 1 } })
+      await Post.findByIdAndUpdate(comment.post, { $inc: { commentsCount: 1 }, $set: { lastActivityAt: new Date() } })
 
       const { post, author, repliesCount, ...rest } = reply.toObject()
       return rest

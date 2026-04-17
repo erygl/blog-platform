@@ -228,7 +228,7 @@ const likePost = async (postSlug: string, userId: string): Promise<void> => {
         }
         throw error
       }
-      await Post.findByIdAndUpdate(post._id, { $inc: { likesCount: 1 } })
+      await Post.findByIdAndUpdate(post._id, { $inc: { likesCount: 1 }, $set: { lastActivityAt: new Date() } })
     })
   } finally {
     await session.endSession()
