@@ -5,7 +5,8 @@ import { generateSlug } from "../utils/slug.js";
 import { ConflictError, NotFoundError } from "../errors/index.js";
 import Like from "../models/Like.js";
 import mongoose, { mongo } from "mongoose";
-import Follow from "../models/Follow.js";
+import Follow from "../models/Follow.js"
+import { calcTrendingScore } from "../jobs/trendingScore.job.js";
 
 const normalizeTagName = (name: string) =>
   name.replace(/\s+/g, " ").trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
@@ -59,13 +60,19 @@ const createPost = async (data: {
     return await session.withTransaction(async () => {
       const tagIds = await resolveTagIds(data.tags ?? [])
 
+      const publishedAt = data.status === "published" ? new Date() : null
       const post = await Post.create({
         ...data,
         author: userId,
         slug,
         excerpt,
         tags: tagIds,
-        publishedAt: data.status === "published" ? new Date() : null
+        publishedAt,
+        ...(publishedAt && {
+          trendingScore: calcTrendingScore(
+            { likesCount: 0, commentsCount: 0, viewsCount: 0, publishedAt }
+          )
+        })
       })
 
       if (data.status === "published") {
@@ -159,13 +166,20 @@ const updatePost = async (
         tagIds = await resolveTagIds(data.tags)
       }
 
+      const isPublishing = !post.publishedAt && data.status === "published"
+      const publishedAt = isPublishing ? new Date() : post.publishedAt
       const updatedPost = await Post.findOneAndUpdate(
         { slug: postSlug },
         {
           ...data,
           excerpt: data.content ? data.content.slice(0, 100).trimEnd() : post.excerpt,
           tags: tagIds ?? post.tags,
-          publishedAt: !post.publishedAt && data.status === "published" ? new Date() : post.publishedAt
+          publishedAt,
+          ...(isPublishing && {
+            trendingScore: calcTrendingScore(
+              { likesCount: 0, commentsCount: 0, viewsCount: 0, publishedAt: publishedAt! }
+            )
+          })
         },
         { returnDocument: "after" }
       )
