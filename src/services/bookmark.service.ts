@@ -2,7 +2,7 @@ import { mongo, Types } from "mongoose"
 import { ConflictError, NotFoundError } from "../errors/index.js"
 import Bookmark from "../models/Bookmark.js"
 import Post from "../models/Post.js"
-import { decode, encode } from "../utils/cursor.js"
+import { decode, paginate } from "../utils/cursor.js"
 
 const addBookmark = async (postSlug: string, userId: string): Promise<void> => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
@@ -50,11 +50,12 @@ const getBookmarks = async (userId: string, cursor: string | undefined, limit: n
     })
     .lean()
 
-  const hasMore = bookmarks.length > limit
-  const sliced = bookmarks.slice(0, limit)
-  const filteredBookmarks = sliced.map(b => b.post).filter(b => b !== null)
-  const last = sliced[sliced.length - 1]
-  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  const { data, hasMore, nextCursor } = paginate(
+    bookmarks,
+    limit,
+    last => ({ id: last._id.toString() })
+  )
+  const filteredBookmarks = data.map(b => b.post).filter(b => b !== null)
   return { bookmarks: filteredBookmarks, hasMore, nextCursor }
 }
 

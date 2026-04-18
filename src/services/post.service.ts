@@ -8,7 +8,7 @@ import mongoose, { mongo, Types } from "mongoose";
 import Follow from "../models/Follow.js"
 import { calcTrendingScore } from "../jobs/trendingScore.job.js"
 import { estimatedReadTime } from "../utils/readTime.js";
-import { encode, decode } from "../utils/cursor.js";
+import { decode, paginate } from "../utils/cursor.js";
 
 const normalizeTagName = (name: string) =>
   name.replace(/\s+/g, " ").trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
@@ -37,8 +37,10 @@ const getTrendingPosts = async (cursor: string | undefined, limit: number) => {
   const cursorFilter = cursor ? (() => {
     const { score, id } = decode<{ score: number, id: string }>(cursor)
     return {
-      $or: [{ trendingScore: { $lt: score } },
-      { trendingScore: score, _id: { $lt: new Types.ObjectId(id) } }]
+      $or: [
+        { trendingScore: { $lt: score } },
+        { trendingScore: score, _id: { $lt: new Types.ObjectId(id) } }
+      ]
     }
   })() : {}
 
@@ -49,12 +51,12 @@ const getTrendingPosts = async (cursor: string | undefined, limit: number) => {
     .populate("author", "-_id username name avatar")
     .lean()
 
-  const hasMore = posts.length > limit
-  const last = posts[limit - 1]
-  const nextCursor = hasMore
-    ? encode({ score: last.trendingScore, id: last._id.toString() })
-    : undefined
-  const sliced = posts.slice(0, limit).map(({ _id, trendingScore, ...rest }) => rest)
+  const { data, hasMore, nextCursor } = paginate(
+    posts,
+    limit,
+    last => ({ score: last.trendingScore, id: last._id.toString() })
+  )
+  const sliced = data.map(({ _id, trendingScore, ...rest }) => rest)
   return { posts: sliced, hasMore, nextCursor }
 }
 
@@ -110,8 +112,10 @@ const getFeed = async (
   const cursorFilter = cursor ? (() => {
     const { publishedAt, id } = decode<{ publishedAt: string, id: string }>(cursor)
     return {
-      $or: [{ publishedAt: { $lt: new Date(publishedAt) } },
-      { publishedAt: new Date(publishedAt), _id: { $lt: new Types.ObjectId(id) } }]
+      $or: [
+        { publishedAt: { $lt: new Date(publishedAt) } },
+        { publishedAt: new Date(publishedAt), _id: { $lt: new Types.ObjectId(id) } }
+      ]
     }
   })() : {}
 
@@ -126,12 +130,14 @@ const getFeed = async (
     .populate("author", "-_id username name avatar")
     .lean()
 
-  const hasMore = posts.length > limit
-  const last = posts[limit - 1]
-  const nextCursor = hasMore ? encode(
-    { publishedAt: last.publishedAt!.toISOString(), id: last._id.toString() }
-  ) : undefined
-  const sliced = posts.slice(0, limit).map(({ _id, ...rest }) => rest)
+  const { data, hasMore, nextCursor } = paginate(
+    posts,
+    limit,
+    last => (
+      { publishedAt: last.publishedAt!.toISOString(), id: last._id.toString() }
+    )
+  )
+  const sliced = data.map(({ _id, ...rest }) => rest)
   return { posts: sliced, hasMore, nextCursor }
 }
 
@@ -150,11 +156,12 @@ const getDrafts = async (
     .select("title slug excerpt updatedAt")
     .lean()
 
-  const hasMore = drafts.length > limit
-  const sliced = drafts.slice(0, limit)
-  const last = sliced[sliced.length - 1]
-  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
-  const result = sliced.map(({ _id, ...rest }) => rest)
+  const { data, hasMore, nextCursor } = paginate(
+    drafts,
+    limit,
+    last => ({ id: last._id.toString() })
+  )
+  const result = data.map(({ _id, ...rest }) => rest)
   return { drafts: result, hasMore, nextCursor }
 }
 
@@ -343,11 +350,12 @@ const getPostLikes = async (
     })
     .lean()
 
-  const hasMore = likes.length > limit
-  const sliced = likes.slice(0, limit)
-  const last = sliced[sliced.length - 1]
-  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
-  const mappedLikes = sliced.map(l => l.user).filter(Boolean)
+  const { data, hasMore, nextCursor } = paginate(
+    likes,
+    limit,
+    last => ({ id: last._id.toString() })
+  )
+  const mappedLikes = data.map(l => l.user).filter(Boolean)
   return { likes: mappedLikes, hasMore, nextCursor }
 }
 

@@ -2,7 +2,7 @@ import { NotFoundError } from "../errors/index.js"
 import Post from "../models/Post.js"
 import Tag from "../models/Tag.js"
 import { Types } from "mongoose"
-import { encode, decode } from "../utils/cursor.js"
+import { decode, paginate } from "../utils/cursor.js"
 
 const getPopularTags = async (limit: number) => {
   const tags = await Tag.find({ postCount: { $gt: 0 } })
@@ -41,13 +41,12 @@ const getTagWithPosts = async (
     .populate("author", "-_id username name avatar")
     .lean()
 
-  const hasMore = posts.length > limit
-  const sliced = posts.slice(0, limit)
-  const last = sliced[sliced.length - 1]
-  const nextCursor = hasMore
-    ? encode({ score: last.trendingScore, id: last._id.toString() })
-    : undefined
-  const result = sliced.map(({ _id, trendingScore, ...rest }) => rest)
+  const { data, hasMore, nextCursor } = paginate(
+    posts,
+    limit,
+    last => ({ score: last.trendingScore, id: last._id.toString() })
+  )
+  const result = data.map(({ _id, trendingScore, ...rest }) => rest)
   return {
     tag: { name: tag.name, postCount: tag.postCount },
     posts: result,

@@ -3,7 +3,7 @@ import Comment from "../models/Comment.js"
 import { BadRequestError, ConflictError, NotFoundError } from "../errors/index.js"
 import Like from "../models/Like.js"
 import mongoose, { mongo, Types } from "mongoose"
-import { encode, decode } from "../utils/cursor.js"
+import { decode, paginate } from "../utils/cursor.js"
 
 const getPostComments = async (
   postSlug: string,
@@ -17,9 +17,10 @@ const getPostComments = async (
   const cursorFilter = cursor ? (() => {
     const { createdAt, id } = decode<{ createdAt: string, id: string }>(cursor)
     return {
-      $or: [{
-        createdAt: { $lt: new Date(createdAt) }
-      }, { createdAt: new Date(createdAt), _id: { $lt: new Types.ObjectId(id) } }]
+      $or: [
+        { createdAt: { $lt: new Date(createdAt) } },
+        { createdAt: new Date(createdAt), _id: { $lt: new Types.ObjectId(id) } }
+      ]
     }
   })() : {}
 
@@ -32,13 +33,14 @@ const getPostComments = async (
     .populate("author", "-_id username name avatar")
     .lean()
 
-  const hasMore = comments.length > limit
-  const sliced = comments.slice(0, limit)
-  const last = sliced[sliced.length - 1]
-  const nextCursor = hasMore
-    ? encode({ createdAt: last.createdAt.toISOString(), id: last._id.toString() })
-    : undefined
-  return { comments: sliced, hasMore, nextCursor }
+  const { data, hasMore, nextCursor } = paginate(
+    comments,
+    limit,
+    last => (
+      { createdAt: last.createdAt.toISOString(), id: last._id.toString() }
+    )
+  )
+  return { comments: data, hasMore, nextCursor }
 }
 
 const addComment = async (content: string, userId: string, postSlug: string) => {
@@ -215,11 +217,12 @@ const getCommentLikes = async (
     })
     .lean()
 
-  const hasMore = likes.length > limit
-  const sliced = likes.slice(0, limit)
-  const last = sliced[sliced.length - 1]
-  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
-  const mappedLikes = sliced.map(l => l.user).filter(Boolean)
+  const { data, hasMore, nextCursor } = paginate(
+    likes,
+    limit,
+    last => ({ id: last._id.toString() })
+  )
+  const mappedLikes = data.map(l => l.user).filter(Boolean)
   return { likes: mappedLikes, hasMore, nextCursor }
 }
 
@@ -258,11 +261,14 @@ const getCommentReplies = async (
     .populate("author", "-_id username name avatar")
     .lean()
 
-  const hasMore = replies.length > limit
-  const sliced = replies.slice(0, limit)
-  const last = sliced[sliced.length - 1]
-  const nextCursor = hasMore ? encode({ createdAt: last.createdAt.toISOString(), id: last._id.toString() }) : undefined
-  return { replies: sliced, hasMore, nextCursor }
+  const { data, hasMore, nextCursor } = paginate(
+    replies,
+    limit,
+    last => (
+      { createdAt: last.createdAt.toISOString(), id: last._id.toString() }
+    )
+  )
+  return { replies: data, hasMore, nextCursor }
 }
 
 const addReply = async (

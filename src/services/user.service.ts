@@ -9,7 +9,7 @@ import Like from "../models/Like.js"
 import mongoose, { mongo, Types } from "mongoose"
 import Follow from "../models/Follow.js"
 import Tag from "../models/Tag.js"
-import { decode, encode } from "../utils/cursor.js"
+import { decode, paginate } from "../utils/cursor.js"
 
 const getMyProfile = async (userId: string) => {
   const user = await User.findById(userId)
@@ -198,12 +198,13 @@ const getLikedPosts = async (userId: string, cursor: string | undefined, limit: 
     .select("post")
     .lean()
 
-  const hasMore = likes.length > limit
-  const sliced = likes.slice(0, limit)
-  const last = sliced[sliced.length - 1]
-  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  const { data, hasMore, nextCursor } = paginate(
+    likes,
+    limit,
+    last => ({ id: last._id.toString() })
+  )
 
-  const slicedPostIds = sliced
+  const slicedPostIds = data
     .map(l => l.post)
     .filter((id): id is Types.ObjectId => id != null)
 
@@ -295,10 +296,12 @@ const getPostsByUsername = async (
     .select("title coverImage excerpt slug likesCount commentsCount publishedAt")
     .lean()
 
-  const hasMore = posts.length > limit
-  const last = posts[limit - 1]
-  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
-  const sliced = posts.slice(0, limit).map(({ _id, ...rest }) => rest)
+  const { data, hasMore, nextCursor } = paginate(
+    posts,
+    limit,
+    last => ({ id: last._id.toString() })
+  )
+  const sliced = data.map(({ _id, ...rest }) => rest)
   return { posts: sliced, hasMore, nextCursor }
 }
 
@@ -391,7 +394,7 @@ const getFollowersList = async (
     ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }
     : {}
 
-  let followers = await Follow.find({ following: user._id, ...cursorFilter })
+  const followers = await Follow.find({ following: user._id, ...cursorFilter })
     .sort({ _id: -1 })
     .limit(limit + 1)
     .select("follower")
@@ -402,11 +405,12 @@ const getFollowersList = async (
     })
     .lean()
 
-  const hasMore = followers.length > limit
-  const sliced = followers.slice(0, limit)
-  const filteredFollowers = sliced.map(f => f.follower).filter(Boolean)
-  const last = sliced[sliced.length - 1]
-  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  const { data, hasMore, nextCursor } = paginate(
+    followers,
+    limit,
+    last => ({ id: last._id.toString() })
+  )
+  const filteredFollowers = data.map(f => f.follower).filter(Boolean)
   return { followers: filteredFollowers, hasMore, nextCursor }
 }
 
@@ -435,11 +439,12 @@ const getFollowingList = async (
     })
     .lean()
 
-  const hasMore = following.length > limit
-  const sliced = following.slice(0, limit)
-  const filteredFollowing = sliced.map(f => f.following).filter(Boolean)
-  const last = sliced[sliced.length - 1]
-  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  const { data, hasMore, nextCursor } = paginate(
+    following,
+    limit,
+    last => ({ id: last._id.toString() })
+  )
+  const filteredFollowing = data.map(f => f.following).filter(Boolean)
   return { following: filteredFollowing, hasMore, nextCursor }
 }
 
