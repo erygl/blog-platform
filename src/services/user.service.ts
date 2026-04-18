@@ -9,6 +9,7 @@ import Like from "../models/Like.js"
 import mongoose, { mongo, Types } from "mongoose"
 import Follow from "../models/Follow.js"
 import Tag from "../models/Tag.js"
+import { decode, encode } from "../utils/cursor.js"
 
 const getMyProfile = async (userId: string) => {
   const user = await User.findById(userId)
@@ -186,18 +187,23 @@ const deleteMyProfile = async (userId: string): Promise<void> => {
   }
 }
 
-const getLikedPosts = async (userId: string, page: number, limit: number) => {
-  const skip = (page - 1) * limit
-  const likes = await Like.find({ user: userId, type: "post" })
-    .sort("-createdAt")
-    .skip(skip)
+const getLikedPosts = async (userId: string, cursor: string | undefined, limit: number) => {
+  const cursorFilter = cursor
+    ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }
+    : {}
+
+  const likes = await Like.find({ user: userId, type: "post", ...cursorFilter })
+    .sort({ _id: -1 })
     .limit(limit + 1)
     .select("post")
     .lean()
 
   const hasMore = likes.length > limit
-  const slicedPostIds = likes
-    .slice(0, limit)
+  const sliced = likes.slice(0, limit)
+  const last = sliced[sliced.length - 1]
+  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+
+  const slicedPostIds = sliced
     .map(l => l.post)
     .filter((id): id is Types.ObjectId => id != null)
 
@@ -207,14 +213,13 @@ const getLikedPosts = async (userId: string, page: number, limit: number) => {
     .lean()
 
   const posts = slicedPostIds.map(id => {
-    const post = postsData
-      .find(post => post._id.toString() === id.toString())
+    const post = postsData.find(post => post._id.toString() === id.toString())
     if (!post) return null
     const { _id, ...rest } = post
     return rest
   }).filter(Boolean)
 
-  return { posts, hasMore }
+  return { posts, hasMore, nextCursor }
 }
 
 const updateEmail = async (
@@ -272,24 +277,29 @@ const getPublicProfile = async (username: string) => {
 
 const getPostsByUsername = async (
   username: string,
-  page: number,
+  cursor: string | undefined,
   limit: number
 ) => {
-  const skip = (page - 1) * limit
   const user = await User.findOne({ username: username }).select("_id").lean()
   if (!user) throw new NotFoundError("User not found")
 
-  const posts = await Post.find({ author: user._id, status: "published" })
-    .sort("-publishedAt")
-    .skip(skip)
-    .limit(limit)
-    .select("-_id title coverImage excerpt slug likesCount commentsCount publishedAt")
+  const cursorFilter = cursor
+    ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }
+    : {}
+
+  const posts = await Post.find(
+    { author: user._id, status: "published", ...cursorFilter }
+  )
+    .sort({ _id: -1 })
+    .limit(limit + 1)
+    .select("title coverImage excerpt slug likesCount commentsCount publishedAt")
     .lean()
 
-
-  const total = await Post.countDocuments({ author: user._id, status: "published" })
-  const hasMore = total > page * limit
-  return { posts, hasMore, total }
+  const hasMore = posts.length > limit
+  const last = posts[limit - 1]
+  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  const sliced = posts.slice(0, limit).map(({ _id, ...rest }) => rest)
+  return { posts: sliced, hasMore, nextCursor }
 }
 
 const followUser = async (userId: string, username: string): Promise<void> => {
@@ -367,42 +377,70 @@ const unfollowUser = async (userId: string, username: string): Promise<void> => 
   }
 }
 
-const getFollowersList = async (username: string, page: number, limit: number) => {
-  const skip = (page - 1) * limit
+const getFollowersList = async (
+  username: string,
+  cursor: string | undefined,
+  limit: number
+) => {
   const user = await User.findOne({ username: username })
     .select("_id")
     .lean()
   if (!user) throw new NotFoundError("User not found")
 
-  let followers = await Follow.find({ following: user._id })
-    .skip(skip)
+  const cursorFilter = cursor
+    ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }
+    : {}
+
+  let followers = await Follow.find({ following: user._id, ...cursorFilter })
+    .sort({ _id: -1 })
     .limit(limit + 1)
-    .select("-_id follower")
-    .populate("follower", "-_id username name avatar")
+    .select("follower")
+    .populate({
+      path: "follower",
+      match: { isBanned: false },
+      select: "-_id username name avatar"
+    })
     .lean()
 
   const hasMore = followers.length > limit
-  const sliced = followers.slice(0, limit).map(f => f.follower)
-  return { followers: sliced, hasMore }
+  const sliced = followers.slice(0, limit)
+  const filteredFollowers = sliced.map(f => f.follower).filter(Boolean)
+  const last = sliced[sliced.length - 1]
+  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  return { followers: filteredFollowers, hasMore, nextCursor }
 }
 
-const getFollowingList = async (username: string, page: number, limit: number) => {
-  const skip = (page - 1) * limit
+const getFollowingList = async (
+  username: string,
+  cursor: string | undefined,
+  limit: number
+) => {
   const user = await User.findOne({ username: username })
     .select("_id")
     .lean()
   if (!user) throw new NotFoundError("User not found")
 
-  const following = await Follow.find({ follower: user._id })
-    .skip(skip)
+  const cursorFilter = cursor
+    ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }
+    : {}
+
+  const following = await Follow.find({ follower: user._id, ...cursorFilter })
+    .sort({ _id: -1 })
     .limit(limit + 1)
-    .select("-_id following")
-    .populate("following", "-_id username name avatar")
+    .select("following")
+    .populate({
+      path: "following",
+      match: { isBanned: false },
+      select: "-_id username name avatar"
+    })
     .lean()
 
   const hasMore = following.length > limit
-  const sliced = following.slice(0, limit).map(f => f.following)
-  return { following: sliced, hasMore }
+  const sliced = following.slice(0, limit)
+  const filteredFollowing = sliced.map(f => f.following).filter(Boolean)
+  const last = sliced[sliced.length - 1]
+  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  return { following: filteredFollowing, hasMore, nextCursor }
 }
 
 export {

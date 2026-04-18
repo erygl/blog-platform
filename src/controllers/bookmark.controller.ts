@@ -17,10 +17,10 @@ const removeBookmark = async (req: Request, res: Response) => {
 
 const getBookmarks = async (req: Request, res: Response) => {
   const userId = req.user!.userId
-  const page = Number(req.query.page) || 1
+  const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { bookmarks, hasMore } = await bookmarkService.getBookmarks(userId, page, limit)
-  res.status(200).json({ bookmarks, hasMore })
+  const { bookmarks, hasMore, nextCursor } = await bookmarkService.getBookmarks(userId, cursor, limit)
+  res.status(200).json({ bookmarks, hasMore, nextCursor })
 }
 
 export {

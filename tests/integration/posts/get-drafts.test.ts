@@ -31,6 +31,7 @@ describe("GET /api/posts/me/drafts", () => {
       .set("Authorization", `Bearer ${accessToken}`)
     expect(res.status).toBe(200)
     expect(res.body.drafts).toHaveLength(0)
+    expect(res.body.hasMore).toBe(false)
   })
 
   it("should return only the user's own drafts", async () => {

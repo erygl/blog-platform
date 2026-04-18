@@ -44,16 +44,23 @@ describe("GET /api/posts/:postSlug/comments/:commentId/replies", () => {
     expect(res.body.hasMore).toBe(false)
   })
 
-  it("should respect limit and return hasMore true", async () => {
+  it("should respect limit and return hasMore with nextCursor", async () => {
     await createReply(accessToken, postSlug, commentId, { content: "Reply 1" })
     await createReply(accessToken, postSlug, commentId, { content: "Reply 2" })
     await createReply(accessToken, postSlug, commentId, { content: "Reply 3" })
 
-    const res = await request(app)
+    const page1 = await request(app)
       .get(`/api/posts/${postSlug}/comments/${commentId}/replies?limit=2`)
-    expect(res.status).toBe(200)
-    expect(res.body.replies).toHaveLength(2)
-    expect(res.body.hasMore).toBe(true)
+    expect(page1.status).toBe(200)
+    expect(page1.body.replies).toHaveLength(2)
+    expect(page1.body.hasMore).toBe(true)
+    expect(page1.body.nextCursor).toBeDefined()
+
+    const page2 = await request(app)
+      .get(`/api/posts/${postSlug}/comments/${commentId}/replies?limit=2&cursor=${page1.body.nextCursor}`)
+    expect(page2.status).toBe(200)
+    expect(page2.body.replies).toHaveLength(1)
+    expect(page2.body.hasMore).toBe(false)
   })
 
   it("should return 404 if comment does not exist", async () => {

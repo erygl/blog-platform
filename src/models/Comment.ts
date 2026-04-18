@@ -7,7 +7,9 @@ interface IComment {
   likesCount: number,
   repliesCount: number,
   isEdited: boolean,
-  parentComment: Types.ObjectId | null
+  parentComment: Types.ObjectId | null,
+  createdAt: Date,
+  updatedAt: Date
 }
 
 const CommentSchema = new Schema<IComment>({

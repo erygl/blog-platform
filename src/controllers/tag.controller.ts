@@ -9,10 +9,10 @@ const getPopularTags = async (req: Request, res: Response) => {
 
 const getTagWithPosts = async (req: Request, res: Response) => {
   const tagSlug = req.params.tagSlug as string
-  const page = Number(req.query.page) || 1
+  const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { tag, posts, hasMore } = await tagService.getTagWithPosts(tagSlug, page, limit)
-  res.status(200).json({ tag, posts, hasMore })
+  const { tag, posts, hasMore, nextCursor } = await tagService.getTagWithPosts(tagSlug, cursor, limit)
+  res.status(200).json({ tag, posts, hasMore, nextCursor })
 }
 
 export {

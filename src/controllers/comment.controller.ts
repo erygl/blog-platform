@@ -1,12 +1,13 @@
 import type { Request, Response } from "express"
 import * as commentService from "../services/comment.service.js"
 import * as commentValidation from "../validations/comment.validation.js"
+
 const getPostComments = async (req: Request, res: Response) => {
-  const page = Number(req.query.page) || 1
+  const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
   const postSlug = req.params.postSlug as string
-  const { comments, hasMore } = await commentService.getPostComments(postSlug, page, limit)
-  res.status(200).json({ comments, hasMore })
+  const { comments, hasMore, nextCursor } = await commentService.getPostComments(postSlug, cursor, limit)
+  res.status(200).json({ comments, hasMore, nextCursor })
 }
 
 const addComment = async (req: Request, res: Response) => {
@@ -53,20 +54,19 @@ const unlikeComment = async (req: Request, res: Response) => {
 const getCommentLikes = async (req: Request, res: Response) => {
   const postSlug = req.params.postSlug as string
   const commentId = req.params.commentId as string
-  const page = Number(req.query.page) || 1
+  const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { likes, hasMore } = await commentService.getCommentLikes(postSlug, commentId, page, limit)
-  res.status(200).json({ likes, hasMore })
+  const { likes, hasMore, nextCursor } = await commentService.getCommentLikes(postSlug, commentId, cursor, limit)
+  res.status(200).json({ likes, hasMore, nextCursor })
 }
-
 
 const getCommentReplies = async (req: Request, res: Response) => {
   const postSlug = req.params.postSlug as string
   const commentId = req.params.commentId as string
-  const page = Number(req.query.page) || 1
+  const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { replies, hasMore } = await commentService.getCommentReplies(postSlug, commentId, page, limit)
-  res.status(200).json({ replies, hasMore })
+  const { replies, hasMore, nextCursor } = await commentService.getCommentReplies(postSlug, commentId, cursor, limit)
+  res.status(200).json({ replies, hasMore, nextCursor })
 }
 
 const addReply = async (req: Request, res: Response) => {

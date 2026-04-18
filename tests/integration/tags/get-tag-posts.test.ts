@@ -40,17 +40,18 @@ describe("GET /api/tags/:tagSlug", () => {
     expect(res.status).toBe(404)
   })
 
-  it("should paginate posts", async () => {
+  it("should paginate posts using cursor", async () => {
     await createPost(accessToken, { title: "TS Post One", tags: ["typescript"] })
     await createPost(accessToken, { title: "TS Post Two", tags: ["typescript"] })
     await createPost(accessToken, { title: "TS Post Three", tags: ["typescript"] })
 
-    const page1 = await request(app).get("/api/tags/typescript?page=1&limit=2")
+    const page1 = await request(app).get("/api/tags/typescript?limit=2")
     expect(page1.status).toBe(200)
     expect(page1.body.posts).toHaveLength(2)
     expect(page1.body.hasMore).toBe(true)
+    expect(page1.body.nextCursor).toBeDefined()
 
-    const page2 = await request(app).get("/api/tags/typescript?page=2&limit=2")
+    const page2 = await request(app).get(`/api/tags/typescript?limit=2&cursor=${page1.body.nextCursor}`)
     expect(page2.status).toBe(200)
     expect(page2.body.posts).toHaveLength(1)
     expect(page2.body.hasMore).toBe(false)

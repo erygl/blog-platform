@@ -55,34 +55,27 @@ describe("GET /api/bookmarks", () => {
     expect(bookmark.author.avatar).toBeDefined()
   })
 
-  it("should respect limit and return hasMore true when more exist", async () => {
+  it("should respect limit and return hasMore with nextCursor", async () => {
     for (let i = 0; i < 3; i++) {
       const post = await createPost(authorToken)
       await request(app)
         .post(`/api/bookmarks/${post.slug}`)
         .set("Authorization", `Bearer ${readerToken}`)
     }
-    const res = await request(app)
+    const page1 = await request(app)
       .get("/api/bookmarks?limit=2")
       .set("Authorization", `Bearer ${readerToken}`)
-    expect(res.status).toBe(200)
-    expect(res.body.bookmarks).toHaveLength(2)
-    expect(res.body.hasMore).toBe(true)
-  })
+    expect(page1.status).toBe(200)
+    expect(page1.body.bookmarks).toHaveLength(2)
+    expect(page1.body.hasMore).toBe(true)
+    expect(page1.body.nextCursor).toBeDefined()
 
-  it("should return second page of bookmarks", async () => {
-    for (let i = 0; i < 3; i++) {
-      const post = await createPost(authorToken)
-      await request(app)
-        .post(`/api/bookmarks/${post.slug}`)
-        .set("Authorization", `Bearer ${readerToken}`)
-    }
-    const res = await request(app)
-      .get("/api/bookmarks?page=2&limit=2")
+    const page2 = await request(app)
+      .get(`/api/bookmarks?limit=2&cursor=${page1.body.nextCursor}`)
       .set("Authorization", `Bearer ${readerToken}`)
-    expect(res.status).toBe(200)
-    expect(res.body.bookmarks).toHaveLength(1)
-    expect(res.body.hasMore).toBe(false)
+    expect(page2.status).toBe(200)
+    expect(page2.body.bookmarks).toHaveLength(1)
+    expect(page2.body.hasMore).toBe(false)
   })
 
   it("should only return the current user's bookmarks", async () => {

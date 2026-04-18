@@ -1,7 +1,8 @@
-import { mongo } from "mongoose"
+import { mongo, Types } from "mongoose"
 import { ConflictError, NotFoundError } from "../errors/index.js"
 import Bookmark from "../models/Bookmark.js"
 import Post from "../models/Post.js"
+import { decode, encode } from "../utils/cursor.js"
 
 const addBookmark = async (postSlug: string, userId: string): Promise<void> => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
@@ -29,15 +30,18 @@ const removeBookmark = async (postSlug: string, userId: string): Promise<void> =
   if (!unBookmark) throw new NotFoundError("Bookmark not found")
 }
 
-const getBookmarks = async (userId: string, page: number, limit: number) => {
-  const skip = (page - 1) * limit
-  const bookmarks = await Bookmark.find({ user: userId })
-    .sort({ createdAt: -1 })
-    .skip(skip)
+const getBookmarks = async (userId: string, cursor: string | undefined, limit: number) => {
+  const cursorFilter = cursor
+    ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }
+    : {}
+
+  const bookmarks = await Bookmark.find({ user: userId, ...cursorFilter })
+    .sort({ _id: -1 })
     .limit(limit + 1)
-    .select("-_id post")
+    .select("post")
     .populate({
       path: "post",
+      match: { status: "published" },
       select: "-_id title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt",
       populate: {
         path: "author",
@@ -46,10 +50,12 @@ const getBookmarks = async (userId: string, page: number, limit: number) => {
     })
     .lean()
 
-  const filteredBookmarks = bookmarks.map(b => b.post).filter(b => b !== null)
-
-  const hasMore = filteredBookmarks.length > limit
-  return { bookmarks: filteredBookmarks.slice(0, limit), hasMore }
+  const hasMore = bookmarks.length > limit
+  const sliced = bookmarks.slice(0, limit)
+  const filteredBookmarks = sliced.map(b => b.post).filter(b => b !== null)
+  const last = sliced[sliced.length - 1]
+  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  return { bookmarks: filteredBookmarks, hasMore, nextCursor }
 }
 
 export {

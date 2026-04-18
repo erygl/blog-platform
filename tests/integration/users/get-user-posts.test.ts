@@ -28,7 +28,6 @@ describe("GET /api/users/:username/posts", () => {
     expect(res.status).toBe(200)
     expect(res.body.posts).toHaveLength(1)
     expect(res.body.posts[0].title).toBe("My Test Post Title")
-    expect(res.body.total).toBe(1)
     expect(res.body.hasMore).toBe(false)
   })
 
@@ -39,7 +38,6 @@ describe("GET /api/users/:username/posts", () => {
 
     expect(res.status).toBe(200)
     expect(res.body.posts).toHaveLength(0)
-    expect(res.body.total).toBe(0)
   })
 
   it("should return empty array when user has no posts", async () => {
@@ -47,11 +45,10 @@ describe("GET /api/users/:username/posts", () => {
 
     expect(res.status).toBe(200)
     expect(res.body.posts).toHaveLength(0)
-    expect(res.body.total).toBe(0)
     expect(res.body.hasMore).toBe(false)
   })
 
-  it("should respect limit and return hasMore", async () => {
+  it("should respect limit and return hasMore with nextCursor", async () => {
     await createPost(accessToken)
     await createPost(accessToken)
     await createPost(accessToken)
@@ -61,6 +58,20 @@ describe("GET /api/users/:username/posts", () => {
     expect(res.status).toBe(200)
     expect(res.body.posts).toHaveLength(2)
     expect(res.body.hasMore).toBe(true)
+    expect(res.body.nextCursor).toBeDefined()
+  })
+
+  it("should return next page using nextCursor", async () => {
+    await createPost(accessToken)
+    await createPost(accessToken)
+    await createPost(accessToken)
+
+    const page1 = await request(app).get("/api/users/john/posts?limit=2")
+    const page2 = await request(app).get(`/api/users/john/posts?limit=2&cursor=${page1.body.nextCursor}`)
+
+    expect(page2.status).toBe(200)
+    expect(page2.body.posts).toHaveLength(1)
+    expect(page2.body.hasMore).toBe(false)
   })
 
   it("should return 404 if user not found", async () => {

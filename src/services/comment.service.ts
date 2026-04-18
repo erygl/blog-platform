@@ -2,25 +2,43 @@ import Post from "../models/Post.js"
 import Comment from "../models/Comment.js"
 import { BadRequestError, ConflictError, NotFoundError } from "../errors/index.js"
 import Like from "../models/Like.js"
-import mongoose, { mongo } from "mongoose"
+import mongoose, { mongo, Types } from "mongoose"
+import { encode, decode } from "../utils/cursor.js"
 
-const getPostComments = async (postSlug: string, page: number, limit: number) => {
+const getPostComments = async (
+  postSlug: string,
+  cursor: string | undefined,
+  limit: number) => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
     .select("_id")
     .lean()
   if (!post) throw new NotFoundError("Post not found")
 
-  const skip = (page - 1) * limit
-  const comments = await Comment.find({ post: post._id, parentComment: null })
-    .sort({ createdAt: -1 })
-    .skip(skip)
+  const cursorFilter = cursor ? (() => {
+    const { createdAt, id } = decode<{ createdAt: string, id: string }>(cursor)
+    return {
+      $or: [{
+        createdAt: { $lt: new Date(createdAt) }
+      }, { createdAt: new Date(createdAt), _id: { $lt: new Types.ObjectId(id) } }]
+    }
+  })() : {}
+
+  const comments = await Comment.find(
+    { post: post._id, parentComment: null, ...cursorFilter }
+  )
+    .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .select("-post")
     .populate("author", "-_id username name avatar")
     .lean()
 
   const hasMore = comments.length > limit
-  return { comments: comments.slice(0, limit), hasMore }
+  const sliced = comments.slice(0, limit)
+  const last = sliced[sliced.length - 1]
+  const nextCursor = hasMore
+    ? encode({ createdAt: last.createdAt.toISOString(), id: last._id.toString() })
+    : undefined
+  return { comments: sliced, hasMore, nextCursor }
 }
 
 const addComment = async (content: string, userId: string, postSlug: string) => {
@@ -169,7 +187,7 @@ const unlikeComment = async (
 const getCommentLikes = async (
   postSlug: string,
   commentId: string,
-  page: number,
+  cursor: string | undefined,
   limit: number
 ) => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
@@ -177,28 +195,38 @@ const getCommentLikes = async (
     .lean()
   if (!post) throw new NotFoundError("Post not found")
 
-  const skip = (page - 1) * limit
   const comment = await Comment.findOne({ _id: commentId, post: post._id })
-    .select("_id likesCount")
+    .select("_id")
     .lean()
   if (!comment) throw new NotFoundError("Comment not found")
 
-  const likes = await Like.find({ comment: comment._id, type: "comment" })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .select("-_id user")
-    .populate("user", "-_id username name avatar bio")
+  const cursorFilter = cursor
+    ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }
+    : {}
+
+  const likes = await Like.find({ comment: comment._id, type: "comment", ...cursorFilter })
+    .sort({ _id: -1 })
+    .limit(limit + 1)
+    .select("user")
+    .populate({
+      path: "user",
+      match: { isBanned: false },
+      select: "-_id username name avatar bio"
+    })
     .lean()
 
-  const hasMore = skip + limit < comment.likesCount
-  return { likes: likes.map(l => l.user), hasMore }
+  const hasMore = likes.length > limit
+  const sliced = likes.slice(0, limit)
+  const last = sliced[sliced.length - 1]
+  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  const mappedLikes = sliced.map(l => l.user).filter(Boolean)
+  return { likes: mappedLikes, hasMore, nextCursor }
 }
 
 const getCommentReplies = async (
   postSlug: string,
   commentId: string,
-  page: number,
+  cursor: string | undefined,
   limit: number
 ) => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
@@ -209,21 +237,32 @@ const getCommentReplies = async (
   const comment = await Comment.findOne(
     { _id: commentId, post: post._id, parentComment: null }
   )
-    .select("_id repliesCount")
+    .select("_id")
     .lean()
   if (!comment) throw new NotFoundError("Comment not found")
 
-  const skip = (page - 1) * limit
-  const replies = await Comment.find({ post: post._id, parentComment: comment._id })
-    .sort({ createdAt: 1 })
-    .skip(skip)
+  const cursorFilter = cursor ? (() => {
+    const { createdAt, id } = decode<{ createdAt: string, id: string }>(cursor)
+    return {
+      $or: [
+        { createdAt: { $gt: new Date(createdAt) } },
+        { createdAt: new Date(createdAt), _id: { $gt: new Types.ObjectId(id) } }
+      ]
+    }
+  })() : {}
+
+  const replies = await Comment.find({ post: post._id, parentComment: comment._id, ...cursorFilter })
+    .sort({ createdAt: 1, _id: 1 })
     .limit(limit + 1)
     .select("-post -repliesCount")
     .populate("author", "-_id username name avatar")
     .lean()
 
   const hasMore = replies.length > limit
-  return { replies: replies.slice(0, limit), hasMore }
+  const sliced = replies.slice(0, limit)
+  const last = sliced[sliced.length - 1]
+  const nextCursor = hasMore ? encode({ createdAt: last.createdAt.toISOString(), id: last._id.toString() }) : undefined
+  return { replies: sliced, hasMore, nextCursor }
 }
 
 const addReply = async (

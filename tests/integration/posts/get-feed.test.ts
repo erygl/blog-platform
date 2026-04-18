@@ -66,7 +66,7 @@ describe("GET /api/posts/feed", () => {
     expect(res.body.posts).toHaveLength(0)
   })
 
-  it("should respect limit and return hasMore", async () => {
+  it("should respect limit and return hasMore with nextCursor", async () => {
     await registerSecondUser()
     const janeLogin = await loginSecondUser()
     const janeToken = janeLogin.accessToken
@@ -84,6 +84,30 @@ describe("GET /api/posts/feed", () => {
     expect(res.status).toBe(200)
     expect(res.body.posts).toHaveLength(2)
     expect(res.body.hasMore).toBe(true)
+    expect(res.body.nextCursor).toBeDefined()
+  })
+
+  it("should return next page using nextCursor", async () => {
+    await registerSecondUser()
+    const janeLogin = await loginSecondUser()
+    const janeToken = janeLogin.accessToken
+    await createPost(janeToken)
+    await createPost(janeToken)
+    await createPost(janeToken)
+
+    const john = await User.findOne({ username: "john" })
+    const jane = await User.findOne({ username: "jane" })
+    await Follow.create({ follower: john!._id, following: jane!._id })
+
+    const page1 = await request(app)
+      .get("/api/posts/feed?limit=2")
+      .set("Authorization", `Bearer ${accessToken}`)
+    const page2 = await request(app)
+      .get(`/api/posts/feed?limit=2&cursor=${page1.body.nextCursor}`)
+      .set("Authorization", `Bearer ${accessToken}`)
+    expect(page2.status).toBe(200)
+    expect(page2.body.posts).toHaveLength(1)
+    expect(page2.body.hasMore).toBe(false)
   })
 
   it("should not return drafts from followed users", async () => {

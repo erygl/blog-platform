@@ -39,15 +39,21 @@ describe("GET /api/posts/:postSlug/comments", () => {
     expect(res.body.hasMore).toBe(false)
   })
 
-  it("should respect limit and return hasMore true", async () => {
+  it("should respect limit and return hasMore with nextCursor", async () => {
     await createComment(accessToken, postSlug, { content: "Comment 1" })
     await createComment(accessToken, postSlug, { content: "Comment 2" })
     await createComment(accessToken, postSlug, { content: "Comment 3" })
 
-    const res = await request(app).get(`/api/posts/${postSlug}/comments?limit=2`)
-    expect(res.status).toBe(200)
-    expect(res.body.comments).toHaveLength(2)
-    expect(res.body.hasMore).toBe(true)
+    const page1 = await request(app).get(`/api/posts/${postSlug}/comments?limit=2`)
+    expect(page1.status).toBe(200)
+    expect(page1.body.comments).toHaveLength(2)
+    expect(page1.body.hasMore).toBe(true)
+    expect(page1.body.nextCursor).toBeDefined()
+
+    const page2 = await request(app).get(`/api/posts/${postSlug}/comments?limit=2&cursor=${page1.body.nextCursor}`)
+    expect(page2.status).toBe(200)
+    expect(page2.body.comments).toHaveLength(1)
+    expect(page2.body.hasMore).toBe(false)
   })
 
   it("should not return replies", async () => {

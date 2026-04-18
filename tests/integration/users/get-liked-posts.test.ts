@@ -46,7 +46,7 @@ describe("GET /api/users/me/likes", () => {
     expect(res.body.hasMore).toBe(false)
   })
 
-  it("should respect limit and return hasMore", async () => {
+  it("should respect limit and return hasMore with nextCursor", async () => {
     const post1 = await createPost(accessToken, {
       title: "First Post Title Here",
       content: "This is the body of the test post and it is long enough to pass validation.",
@@ -63,21 +63,26 @@ describe("GET /api/users/me/likes", () => {
       status: "published"
     })
 
-    const like1 = await request(app).post(`/api/posts/${post1.slug}/like`).set("Authorization", `Bearer ${accessToken}`)
-    const like2 = await request(app).post(`/api/posts/${post2.slug}/like`).set("Authorization", `Bearer ${accessToken}`)
-    const like3 = await request(app).post(`/api/posts/${post3.slug}/like`).set("Authorization", `Bearer ${accessToken}`)
+    await request(app).post(`/api/posts/${post1.slug}/like`).set("Authorization", `Bearer ${accessToken}`)
+    await request(app).post(`/api/posts/${post2.slug}/like`).set("Authorization", `Bearer ${accessToken}`)
+    await request(app).post(`/api/posts/${post3.slug}/like`).set("Authorization", `Bearer ${accessToken}`)
 
-    expect(like1.status).toBe(200)
-    expect(like2.status).toBe(200)
-    expect(like3.status).toBe(200)
-
-    const res = await request(app)
+    const page1 = await request(app)
       .get("/api/users/me/likes?limit=2")
       .set("Authorization", `Bearer ${accessToken}`)
 
-    expect(res.status).toBe(200)
-    expect(res.body.posts).toHaveLength(2)
-    expect(res.body.hasMore).toBe(true)
+    expect(page1.status).toBe(200)
+    expect(page1.body.posts).toHaveLength(2)
+    expect(page1.body.hasMore).toBe(true)
+    expect(page1.body.nextCursor).toBeDefined()
+
+    const page2 = await request(app)
+      .get(`/api/users/me/likes?limit=2&cursor=${page1.body.nextCursor}`)
+      .set("Authorization", `Bearer ${accessToken}`)
+
+    expect(page2.status).toBe(200)
+    expect(page2.body.posts).toHaveLength(1)
+    expect(page2.body.hasMore).toBe(false)
   })
 
   it("should return 401 if no auth token", async () => {

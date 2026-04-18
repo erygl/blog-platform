@@ -30,10 +30,10 @@ const deleteMyProfile = async (req: Request, res: Response) => {
 
 const getLikedPosts = async (req: Request, res: Response) => {
   const userId = req.user!.userId
-  const page = Number(req.query.page) || 1
+  const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { posts, hasMore } = await userService.getLikedPosts(userId, page, limit)
-  res.status(200).json({ posts, hasMore })
+  const { posts, hasMore, nextCursor } = await userService.getLikedPosts(userId, cursor, limit)
+  res.status(200).json({ posts, hasMore, nextCursor })
 }
 
 const updateEmail = async (req: Request, res: Response) => {
@@ -58,10 +58,10 @@ const getPublicProfile = async (req: Request, res: Response) => {
 
 const getPostsByUsername = async (req: Request, res: Response) => {
   const username = req.params.username as string
-  const page = Number(req.query.page) || 1
+  const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { posts, hasMore, total } = await userService.getPostsByUsername(username, page, limit)
-  res.status(200).json({ posts, hasMore, total })
+  const { posts, hasMore, nextCursor } = await userService.getPostsByUsername(username, cursor, limit)
+  res.status(200).json({ posts, hasMore, nextCursor })
 }
 
 const followUser = async (req: Request, res: Response) => {
@@ -80,18 +80,18 @@ const unfollowUser = async (req: Request, res: Response) => {
 
 const getFollowersList = async (req: Request, res: Response) => {
   const username = req.params.username as string
-  const page = Number(req.query.page) || 1
+  const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { followers, hasMore } = await userService.getFollowersList(username, page, limit)
-  res.status(200).json({ followers, hasMore })
+  const { followers, hasMore, nextCursor } = await userService.getFollowersList(username, cursor, limit)
+  res.status(200).json({ followers, hasMore, nextCursor })
 }
 
 const getFollowingList = async (req: Request, res: Response) => {
   const username = req.params.username as string
-  const page = Number(req.query.page) || 1
+  const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { following, hasMore } = await userService.getFollowingList(username, page, limit)
-  res.status(200).json({ following, hasMore })
+  const { following, hasMore, nextCursor } = await userService.getFollowingList(username, cursor, limit)
+  res.status(200).json({ following, hasMore, nextCursor })
 }
 
 export {

@@ -46,7 +46,7 @@ describe("GET /api/users/:username/following", () => {
     expect(res.body.hasMore).toBe(false)
   })
 
-  it("should respect limit and return hasMore", async () => {
+  it("should respect limit and return hasMore with nextCursor", async () => {
     for (const user of [
       { username: "user1", name: "User One", email: "user1@example.com" },
       { username: "user2", name: "User Two", email: "user2@example.com" },
@@ -58,13 +58,22 @@ describe("GET /api/users/:username/following", () => {
         .set("Authorization", `Bearer ${accessToken}`)
     }
 
-    const res = await request(app)
+    const page1 = await request(app)
       .get("/api/users/john/following?limit=2")
       .set("Authorization", `Bearer ${accessToken}`)
 
-    expect(res.status).toBe(200)
-    expect(res.body.following).toHaveLength(2)
-    expect(res.body.hasMore).toBe(true)
+    expect(page1.status).toBe(200)
+    expect(page1.body.following).toHaveLength(2)
+    expect(page1.body.hasMore).toBe(true)
+    expect(page1.body.nextCursor).toBeDefined()
+
+    const page2 = await request(app)
+      .get(`/api/users/john/following?limit=2&cursor=${page1.body.nextCursor}`)
+      .set("Authorization", `Bearer ${accessToken}`)
+
+    expect(page2.status).toBe(200)
+    expect(page2.body.following).toHaveLength(1)
+    expect(page2.body.hasMore).toBe(false)
   })
 
   it("should return 404 if user not found", async () => {

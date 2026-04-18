@@ -45,7 +45,7 @@ describe("GET /api/posts", () => {
     expect(res.body.hasMore).toBe(false)
   })
 
-  it("should respect limit query param", async () => {
+  it("should respect limit query param and return nextCursor", async () => {
     await createPost(accessToken)
     await createPost(accessToken)
     await createPost(accessToken)
@@ -54,5 +54,18 @@ describe("GET /api/posts", () => {
     expect(res.status).toBe(200)
     expect(res.body.posts).toHaveLength(2)
     expect(res.body.hasMore).toBe(true)
+    expect(res.body.nextCursor).toBeDefined()
+  })
+
+  it("should return next page using nextCursor", async () => {
+    await createPost(accessToken)
+    await createPost(accessToken)
+    await createPost(accessToken)
+
+    const page1 = await request(app).get("/api/posts?limit=2")
+    const page2 = await request(app).get(`/api/posts?limit=2&cursor=${page1.body.nextCursor}`)
+    expect(page2.status).toBe(200)
+    expect(page2.body.posts).toHaveLength(1)
+    expect(page2.body.hasMore).toBe(false)
   })
 })

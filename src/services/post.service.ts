@@ -4,10 +4,11 @@ import Comment from "../models/Comment.js";
 import { generateSlug } from "../utils/slug.js";
 import { ConflictError, NotFoundError } from "../errors/index.js";
 import Like from "../models/Like.js";
-import mongoose, { mongo } from "mongoose";
+import mongoose, { mongo, Types } from "mongoose";
 import Follow from "../models/Follow.js"
 import { calcTrendingScore } from "../jobs/trendingScore.job.js"
 import { estimatedReadTime } from "../utils/readTime.js";
+import { encode, decode } from "../utils/cursor.js";
 
 const normalizeTagName = (name: string) =>
   name.replace(/\s+/g, " ").trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
@@ -32,18 +33,29 @@ const resolveTagIds = async (tagNames: string[]) => {
   return normalized.map(name => tags.find(t => t.name === name)!._id)
 }
 
-const getTrendingPosts = async (page: number, limit: number) => {
-  const skip = (page - 1) * limit
-  const posts = await Post.find({ status: "published" })
-    .sort({ trendingScore: -1 })
-    .skip(skip)
+const getTrendingPosts = async (cursor: string | undefined, limit: number) => {
+  const cursorFilter = cursor ? (() => {
+    const { score, id } = decode<{ score: number, id: string }>(cursor)
+    return {
+      $or: [{ trendingScore: { $lt: score } },
+      { trendingScore: score, _id: { $lt: new Types.ObjectId(id) } }]
+    }
+  })() : {}
+
+  const posts = await Post.find({ status: "published", ...cursorFilter })
+    .sort({ trendingScore: -1, _id: -1 })
     .limit(limit + 1)
-    .select("-_id title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
+    .select("title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt trendingScore")
     .populate("author", "-_id username name avatar")
     .lean()
 
   const hasMore = posts.length > limit
-  return { posts: posts.slice(0, limit), hasMore }
+  const last = posts[limit - 1]
+  const nextCursor = hasMore
+    ? encode({ score: last.trendingScore, id: last._id.toString() })
+    : undefined
+  const sliced = posts.slice(0, limit).map(({ _id, trendingScore, ...rest }) => rest)
+  return { posts: sliced, hasMore, nextCursor }
 }
 
 const createPost = async (data: {
@@ -90,29 +102,60 @@ const createPost = async (data: {
 
 }
 
-const getFeed = async (userId: string, page: number, limit: number) => {
-  const skip = (page - 1) * limit
+const getFeed = async (
+  userId: string,
+  cursor: string | undefined,
+  limit: number
+) => {
+  const cursorFilter = cursor ? (() => {
+    const { publishedAt, id } = decode<{ publishedAt: string, id: string }>(cursor)
+    return {
+      $or: [{ publishedAt: { $lt: new Date(publishedAt) } },
+      { publishedAt: new Date(publishedAt), _id: { $lt: new Types.ObjectId(id) } }]
+    }
+  })() : {}
+
   const followedUsers = await Follow.find({ follower: userId }).select("following").lean()
   const followedUserIds = followedUsers.map(f => f.following)
-  const posts = await Post.find({ author: { $in: followedUserIds }, status: "published" })
-    .sort("-publishedAt")
-    .skip(skip)
+  const posts = await Post.find(
+    { author: { $in: followedUserIds }, status: "published", ...cursorFilter }
+  )
+    .sort({ publishedAt: -1, _id: -1 })
     .limit(limit + 1)
-    .select("-_id title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
+    .select("title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt")
     .populate("author", "-_id username name avatar")
     .lean()
 
   const hasMore = posts.length > limit
-  return { posts: posts.slice(0, limit), hasMore }
+  const last = posts[limit - 1]
+  const nextCursor = hasMore ? encode(
+    { publishedAt: last.publishedAt!.toISOString(), id: last._id.toString() }
+  ) : undefined
+  const sliced = posts.slice(0, limit).map(({ _id, ...rest }) => rest)
+  return { posts: sliced, hasMore, nextCursor }
 }
 
-const getDrafts = async (userId: string) => {
-  const drafts = await Post.find({ author: userId, status: "draft" })
-    .sort("-createdAt")
+const getDrafts = async (
+  userId: string,
+  cursor: string | undefined,
+  limit: number
+) => {
+  const cursorFilter = cursor
+    ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }
+    : {}
+
+  const drafts = await Post.find({ author: userId, status: "draft", ...cursorFilter })
+    .sort({ _id: -1 })
+    .limit(limit + 1)
     .select("title slug excerpt updatedAt")
     .lean()
 
-  return drafts
+  const hasMore = drafts.length > limit
+  const sliced = drafts.slice(0, limit)
+  const last = sliced[sliced.length - 1]
+  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  const result = sliced.map(({ _id, ...rest }) => rest)
+  return { drafts: result, hasMore, nextCursor }
 }
 
 const getSingleDraft = async (userId: string, postSlug: string) => {
@@ -248,7 +291,9 @@ const likePost = async (postSlug: string, userId: string): Promise<void> => {
         }
         throw error
       }
-      await Post.findByIdAndUpdate(post._id, { $inc: { likesCount: 1 }, $set: { lastActivityAt: new Date() } })
+      await Post.findByIdAndUpdate(post._id, {
+        $inc: { likesCount: 1 }, $set: { lastActivityAt: new Date() }
+      })
     })
   } finally {
     await session.endSession()
@@ -272,23 +317,38 @@ const unlikePost = async (postSlug: string, userId: string): Promise<void> => {
   }
 }
 
-const getPostLikes = async (postSlug: string, page: number, limit: number) => {
-  const skip = (page - 1) * limit
+const getPostLikes = async (
+  postSlug: string,
+  cursor: string | undefined,
+  limit: number
+) => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
     .select("_id")
     .lean()
 
   if (!post) throw new NotFoundError("Post not found")
 
-  const likes = await Like.find({ post: post._id })
-    .skip(skip)
+  const cursorFilter = cursor
+    ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }
+    : {}
+
+  const likes = await Like.find({ post: post._id, ...cursorFilter })
+    .sort({ _id: -1 })
     .limit(limit + 1)
-    .select("-_id user")
-    .populate("user", "-_id username name avatar bio")
+    .select("user")
+    .populate({
+      path: "user",
+      match: { isBanned: false },
+      select: "-_id username name avatar bio"
+    })
     .lean()
 
   const hasMore = likes.length > limit
-  return { likes: likes.slice(0, limit).map(l => l.user), hasMore }
+  const sliced = likes.slice(0, limit)
+  const last = sliced[sliced.length - 1]
+  const nextCursor = hasMore ? encode({ id: last._id.toString() }) : undefined
+  const mappedLikes = sliced.map(l => l.user).filter(Boolean)
+  return { likes: mappedLikes, hasMore, nextCursor }
 }
 
 export {
