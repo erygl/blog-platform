@@ -8,6 +8,7 @@ interface IPost {
   tags: Types.ObjectId[]
   status: "draft" | "published" | "archived"
   excerpt: string,
+  readingTime: number,
   slug: string,
   viewsCount: number,
   likesCount: number,
@@ -56,6 +57,10 @@ const PostSchema = new Schema<IPost>({
   excerpt: {
     type: String,
     required: true
+  },
+  readingTime: {
+    type: Number,
+    default: 0
   },
   slug: {
     type: String,

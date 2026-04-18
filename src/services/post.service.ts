@@ -6,7 +6,8 @@ import { ConflictError, NotFoundError } from "../errors/index.js";
 import Like from "../models/Like.js";
 import mongoose, { mongo } from "mongoose";
 import Follow from "../models/Follow.js"
-import { calcTrendingScore } from "../jobs/trendingScore.job.js";
+import { calcTrendingScore } from "../jobs/trendingScore.job.js"
+import { estimatedReadTime } from "../utils/readTime.js";
 
 const normalizeTagName = (name: string) =>
   name.replace(/\s+/g, " ").trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
@@ -54,6 +55,7 @@ const createPost = async (data: {
 }, userId: string) => {
   const slug = generateSlug(data.title, true)
   const excerpt = data.content.slice(0, 100).trimEnd()
+  const readingTime = estimatedReadTime(data.content)
 
   const session = await mongoose.startSession()
   try {
@@ -66,6 +68,7 @@ const createPost = async (data: {
         author: userId,
         slug,
         excerpt,
+        readingTime,
         tags: tagIds,
         publishedAt,
         ...(publishedAt && {
@@ -154,6 +157,8 @@ const updatePost = async (
   userId: string
 ) => {
 
+  const readingTime = data.content ? estimatedReadTime(data.content) : undefined
+
   const session = await mongoose.startSession()
   try {
     return await session.withTransaction(async () => {
@@ -173,6 +178,7 @@ const updatePost = async (
         {
           ...data,
           excerpt: data.content ? data.content.slice(0, 100).trimEnd() : post.excerpt,
+          ...(readingTime !== undefined && { readingTime }),
           tags: tagIds ?? post.tags,
           publishedAt,
           ...(isPublishing && {

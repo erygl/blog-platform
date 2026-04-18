@@ -25,6 +25,7 @@ describe("GET /api/posts/:postSlug", () => {
     const res = await request(app).get(`/api/posts/${post.slug}`)
     expect(res.status).toBe(200)
     expect(res.body.post.slug).toBe(post.slug)
+    expect(res.body.post.readingTime).toBeGreaterThanOrEqual(1)
     expect(res.body.post.likes).toBeUndefined()
     expect(res.body.post.trendingScore).toBeUndefined()
   })

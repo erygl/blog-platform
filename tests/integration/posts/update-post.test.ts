@@ -28,6 +28,7 @@ describe("PUT /api/posts/:postSlug", () => {
       .send({ title: "Updated Title" })
     expect(res.status).toBe(200)
     expect(res.body.post.title).toBe("Updated Title")
+    expect(res.body.post.readingTime).toBeGreaterThanOrEqual(1)
     expect(res.body.message).toBe("Post updated successfully")
   })
 

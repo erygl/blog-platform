@@ -31,6 +31,7 @@ describe("POST /api/posts", () => {
     expect(res.status).toBe(201)
     expect(res.body.post.status).toBe("draft")
     expect(res.body.post.slug).toBeDefined()
+    expect(res.body.post.readingTime).toBeGreaterThanOrEqual(1)
     expect(res.body.message).toBe("Post created successfully")
   })
 
