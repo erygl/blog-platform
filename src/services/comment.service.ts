@@ -4,6 +4,7 @@ import { BadRequestError, ConflictError, NotFoundError } from "../errors/index.j
 import Like from "../models/Like.js"
 import mongoose, { mongo, Types } from "mongoose"
 import { decode, paginate } from "../utils/cursor.js"
+import notificationEmitter from "../config/notificationEmitter.js"
 
 const getPostComments = async (
   postSlug: string,
@@ -45,10 +46,11 @@ const getPostComments = async (
 
 const addComment = async (content: string, userId: string, postSlug: string) => {
   const session = await mongoose.startSession()
+  let transaction
   try {
-    return await session.withTransaction(async () => {
+    transaction = await session.withTransaction(async () => {
       const commentedPost = await Post.findOne({ slug: postSlug, status: "published" })
-        .select("_id")
+        .select("_id author")
         .lean()
       if (!commentedPost) throw new NotFoundError("Post not found")
 
@@ -58,13 +60,30 @@ const addComment = async (content: string, userId: string, postSlug: string) => 
         content: content
       })
 
-      await Post.findByIdAndUpdate(commentedPost._id, { $inc: { commentsCount: 1 }, $set: { lastActivityAt: new Date() } })
+      await Post.findByIdAndUpdate(
+        commentedPost._id,
+        { $inc: { commentsCount: 1 }, $set: { lastActivityAt: new Date() } }
+      )
       const { post, author, ...rest } = comment.toObject()
-      return rest
+      return {
+        commentData: rest,
+        postAuthorId: commentedPost.author.toString(),
+        postId: commentedPost._id.toString()
+      }
     })
   } finally {
     await session.endSession()
   }
+
+  notificationEmitter.emit("notification", {
+    recipientId: transaction.postAuthorId,
+    senderId: userId,
+    type: "post_comment",
+    postId: transaction.postId,
+    commentId: transaction.commentData._id.toString()
+  })
+
+  return transaction.commentData
 }
 
 const editComment = async (
@@ -137,10 +156,11 @@ const likeComment = async (
   commentId: string
 ): Promise<void> => {
   const session = await mongoose.startSession()
+  let transaction
   try {
-    await session.withTransaction(async () => {
+    transaction = await session.withTransaction(async () => {
       const comment = await Comment.findOne({ _id: commentId })
-        .select("_id")
+        .select("_id post author")
         .populate({ path: "post", match: { slug: postSlug, status: "published" } })
         .lean()
       if (!comment || !comment.post) throw new NotFoundError("Comment not found")
@@ -155,10 +175,22 @@ const likeComment = async (
       }
 
       await Comment.findByIdAndUpdate(commentId, { $inc: { likesCount: 1 } })
+      return {
+        authorId: comment.author.toString(),
+        postId: comment.post._id.toString()
+      }
     })
   } finally {
     await session.endSession()
   }
+
+  notificationEmitter.emit("notification", {
+    recipientId: transaction.authorId,
+    senderId: userId,
+    type: "comment_like",
+    postId: transaction.postId,
+    commentId: commentId,
+  })
 }
 
 const unlikeComment = async (
@@ -278,10 +310,11 @@ const addReply = async (
   commentId: string
 ) => {
   const session = await mongoose.startSession()
+  let transaction
   try {
-    return await session.withTransaction(async () => {
+    transaction = await session.withTransaction(async () => {
       const comment = await Comment.findOne({ _id: commentId })
-        .select("_id parentComment")
+        .select("_id post author parentComment")
         .populate(
           {
             path: "post",
@@ -303,11 +336,25 @@ const addReply = async (
       await Post.findByIdAndUpdate(comment.post, { $inc: { commentsCount: 1 }, $set: { lastActivityAt: new Date() } })
 
       const { post, author, repliesCount, ...rest } = reply.toObject()
-      return rest
+      return {
+        replyData: rest,
+        authorId: comment.author.toString(),
+        postId: comment.post._id.toString()
+      }
     })
   } finally {
     await session.endSession()
   }
+
+  notificationEmitter.emit("notification", {
+    recipientId: transaction.authorId,
+    senderId: userId,
+    type: "comment_reply",
+    postId: transaction.postId,
+    commentId: transaction.replyData._id.toString()
+  })
+
+  return transaction.replyData
 }
 
 export {

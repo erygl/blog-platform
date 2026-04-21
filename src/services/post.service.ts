@@ -9,6 +9,7 @@ import Follow from "../models/Follow.js"
 import { calcTrendingScore } from "../jobs/trendingScore.job.js"
 import { estimatedReadTime } from "../utils/readTime.js";
 import { decode, paginate } from "../utils/cursor.js";
+import notificationEmitter from "../config/notificationEmitter.js";
 
 const normalizeTagName = (name: string) =>
   name.replace(/\s+/g, " ").trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
@@ -283,11 +284,11 @@ const deletePost = async (postSlug: string, userId: string): Promise<void> => {
 
 const likePost = async (postSlug: string, userId: string): Promise<void> => {
   const session = await mongoose.startSession()
+  let transaction
   try {
-    await session.withTransaction(async () => {
-
+    transaction = await session.withTransaction(async () => {
       const post = await Post.findOne({ slug: postSlug, status: "published" })
-        .select("_id").lean()
+        .select("_id author").lean()
       if (!post) throw new NotFoundError("Post not found")
 
       try {
@@ -301,10 +302,21 @@ const likePost = async (postSlug: string, userId: string): Promise<void> => {
       await Post.findByIdAndUpdate(post._id, {
         $inc: { likesCount: 1 }, $set: { lastActivityAt: new Date() }
       })
+      return {
+        recipientId: post.author.toString(),
+        postId: post._id.toString()
+      }
     })
   } finally {
     await session.endSession()
   }
+
+  notificationEmitter.emit("notification", {
+    recipientId: transaction.recipientId,
+    senderId: userId,
+    type: "post_like",
+    postId: transaction.postId
+  })
 }
 
 const unlikePost = async (postSlug: string, userId: string): Promise<void> => {

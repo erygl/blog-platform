@@ -10,6 +10,7 @@ import mongoose, { mongo, Types } from "mongoose"
 import Follow from "../models/Follow.js"
 import Tag from "../models/Tag.js"
 import { decode, paginate } from "../utils/cursor.js"
+import notificationEmitter from "../config/notificationEmitter.js"
 
 const getMyProfile = async (userId: string) => {
   const user = await User.findById(userId)
@@ -307,8 +308,9 @@ const getPostsByUsername = async (
 
 const followUser = async (userId: string, username: string): Promise<void> => {
   const session = await mongoose.startSession()
+  let transaction
   try {
-    await session.withTransaction(async () => {
+    transaction = await session.withTransaction(async () => {
       const user = await User.findOne({ username: username })
         .select("_id")
         .lean()
@@ -339,10 +341,18 @@ const followUser = async (userId: string, username: string): Promise<void> => {
           }
         }
       ])
+
+      return { recipientId: user._id.toString() }
     })
   } finally {
     await session.endSession()
   }
+
+  notificationEmitter.emit("notification", {
+    recipientId: transaction.recipientId,
+    senderId: userId,
+    type: "follow"
+  })
 }
 
 const unfollowUser = async (userId: string, username: string): Promise<void> => {
