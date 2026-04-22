@@ -3,7 +3,7 @@ import Post from "../models/Post.js"
 import Comment from "../models/Comment.js"
 import { NotFoundError, UnauthorizedError, BadRequestError, ConflictError } from "../errors/index.js"
 import bcrypt from "bcryptjs"
-import { sendVerificationEmail } from "../utils/email.js"
+import { sendEmail, emailTemplates } from "../utils/email.js"
 import { createVerificationToken } from "../utils/token.js"
 import Like from "../models/Like.js"
 import mongoose, { mongo, Types } from "mongoose"
@@ -34,10 +34,12 @@ const updateProfile = async (
 
 const deleteMyProfile = async (userId: string): Promise<void> => {
   const session = await mongoose.startSession()
+  let deletedUser: { email: string, username: string } | null = null
   try {
     await session.withTransaction(async () => {
       const user = await User.findById(userId).lean()
       if (!user) throw new NotFoundError("User not found")
+      deletedUser = { email: user.email, username: user.username }
 
       const authorPosts = await Post.find({ author: userId })
         .select("_id tags status")
@@ -186,6 +188,12 @@ const deleteMyProfile = async (userId: string): Promise<void> => {
   } finally {
     await session.endSession()
   }
+
+  if (deletedUser) {
+    const { email, username } = deletedUser as { email: string, username: string }
+    sendEmail(email, emailTemplates.accountDeleted(username))
+      .catch(err => console.error("Email failed:", err))
+  }
 }
 
 const getLikedPosts = async (userId: string, cursor: string | undefined, limit: number) => {
@@ -238,12 +246,15 @@ const updateEmail = async (
   if (user.email === email)
     throw new BadRequestError("New email must be different from current email")
 
+  const oldEmail = user.email
   user.email = email
   user.isVerified = false
   await user.save()
 
+  sendEmail(oldEmail, emailTemplates.emailChanged(email))
+    .catch(err => console.error("Email failed:", err))
   const token = createVerificationToken(userId)
-  await sendVerificationEmail(user.email, token)
+  await sendEmail(user.email, emailTemplates.verifyEmail(token))
 }
 
 const updatePassword = async (
@@ -261,9 +272,14 @@ const updatePassword = async (
     throw new BadRequestError("New password can not be the same with old password")
 
   const hashedNewPassword = await bcrypt.hash(newPassword, 10)
+  const flagToken = createVerificationToken(userId, "72h")
+
   user.password = hashedNewPassword
   user.refreshToken = null
   await user.save()
+
+  sendEmail(user.email, emailTemplates.passwordChanged(flagToken))
+    .catch(err => console.error("Email failed:", err))
 }
 
 const getPublicProfile = async (username: string) => {

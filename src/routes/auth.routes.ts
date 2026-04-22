@@ -7,7 +7,8 @@ import {
   verifyEmail,
   forgottenPassword,
   resetPassword,
-  refresh
+  refresh,
+  flagCompromise
 } from "../controllers/auth.controller.js"
 
 const router = Router()
@@ -19,4 +20,5 @@ router.route("/verify-email").get(verifyEmail)
 router.route("/forgotten-password").post(forgottenPassword)
 router.route("/reset-password").post(resetPassword)
 router.route("/refresh").post(refresh)
+router.route("/flag-compromise").get(flagCompromise)
 export default router

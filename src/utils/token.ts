@@ -35,8 +35,10 @@ const verifyRefreshToken = (token: string): { userId: string } => {
   }
 }
 
-const createVerificationToken = (userId: string): string => {
-  return jwt.sign({ userId }, env.verificationTokenSecret, { expiresIn: "15m" })
+const createVerificationToken = (userId: string, expiresIn = "15m"): string => {
+  return jwt.sign({ userId }, env.verificationTokenSecret,
+    { expiresIn: expiresIn as jwt.SignOptions["expiresIn"] }
+  )
 }
 
 const verifyVerificationToken = (token: string): { userId: string } => {

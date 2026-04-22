@@ -64,6 +64,14 @@ const refresh = async (req: Request, res: Response) => {
   res.status(200).json({ accessToken: newAccessToken })
 }
 
+const flagCompromise = async (req: Request, res: Response) => {
+  const token = req.query.token
+  if (!token || typeof token !== "string")
+    throw new BadRequestError("Token is missing")
+  await authService.flagCompromise(token)
+  res.status(200).json({ message: "Check your email for a password reset link." })
+}
+
 export {
   register,
   login,
@@ -71,5 +79,6 @@ export {
   verifyEmail,
   forgottenPassword,
   resetPassword,
-  refresh
+  refresh,
+  flagCompromise
 }

@@ -1,4 +1,5 @@
 import { NotFoundError } from "../errors/index.js"
+import { sendEmail, emailTemplates } from "../utils/email.js"
 import User from "../models/User.js"
 import Post from "../models/Post.js"
 import Like from "../models/Like.js"
@@ -72,6 +73,10 @@ const updateUser = async (
 
   const user = await User.findByIdAndUpdate(userId, update)
   if (!user) throw new NotFoundError("User not found")
+
+  if (data.isBanned === true)
+    sendEmail(user.email, emailTemplates.accountBanned(user.username))
+      .catch(err => console.error("Email failed:", err))
 }
 
 const getPosts = async (

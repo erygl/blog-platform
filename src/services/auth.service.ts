@@ -12,7 +12,7 @@ import {
   verifyRefreshToken,
   verifyVerificationToken
 } from "../utils/token.js"
-import { sendVerificationEmail, sendResetEmail } from "../utils/email.js"
+import { sendEmail, emailTemplates } from "../utils/email.js"
 import crypto from "crypto"
 
 
@@ -29,7 +29,7 @@ const registerUser = async (input: {
   const user = await User.create({ ...input, password: hashedPassword })
 
   const verificationToken = createVerificationToken(user._id.toString())
-  await sendVerificationEmail(user.email, verificationToken)
+  await sendEmail(user.email, emailTemplates.verifyEmail(verificationToken))
 
   return {
     username: user.username,
@@ -93,7 +93,7 @@ const sendPasswordResetEmail = async (email: string): Promise<void> => {
     user.passwordResetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000) // 1h
     await user.save()
 
-    await sendResetEmail(user.email, resetToken)
+    await sendEmail(user.email, emailTemplates.resetPassword(resetToken))
   }
 }
 
@@ -141,6 +141,23 @@ const refreshAccessToken = async (refreshToken: string) => {
   return newAccessToken
 }
 
+const flagCompromise = async (token: string): Promise<void> => {
+  const { userId } = verifyVerificationToken(token)
+
+  const user = await User.findById(userId)
+  if (!user) throw new BadRequestError("Invalid token")
+
+  const resetToken = crypto.randomBytes(32).toString("hex")
+  const hashedResetToken = crypto.createHash("sha256").update(resetToken).digest("hex")
+
+  user.passwordResetToken = hashedResetToken
+  user.passwordResetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000)
+  user.refreshToken = null
+  await user.save()
+
+  await sendEmail(user.email, emailTemplates.resetPassword(resetToken))
+}
+
 export {
   registerUser,
   loginUser,
@@ -148,5 +165,6 @@ export {
   verifyUserEmail,
   sendPasswordResetEmail,
   resetUserPassword,
-  refreshAccessToken
+  refreshAccessToken,
+  flagCompromise
 }
