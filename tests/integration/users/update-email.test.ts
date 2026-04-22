@@ -1,10 +1,11 @@
 import { afterEach, vi, describe, it, expect } from "vitest"
 import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
-import { sendVerificationEmail } from "../../../src/utils/email.js"
+import * as emailUtils from "../../../src/utils/email.js"
 import User from "../../../src/models/User.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 afterEach(async () => {
@@ -26,7 +27,7 @@ describe("PATCH api/users/me/email", () => {
     const user = await User.findOne({ email: "newemail@example.com" })
     expect(user).not.toBeNull()
     expect(user!.isVerified).toBe(false)
-    expect(sendVerificationEmail).toHaveBeenCalledOnce()
+    expect(emailUtils.sendEmail).toHaveBeenCalledTimes(2)
   })
 
   it("should return 400 if new email is same as current", async () => {

@@ -1,9 +1,11 @@
 import { afterEach, vi, describe, it, expect } from "vitest"
 import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
 import User from "../../../src/models/User.js"
+import * as emailUtils from "../../../src/utils/email.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 afterEach(async () => {
@@ -23,6 +25,7 @@ describe("PATCH api/users/me/password", () => {
 
     const user = await User.findOne({ email: "john@example.com" }).select("+refreshToken")
     expect(user!.refreshToken).toBeNull()
+    expect(emailUtils.sendEmail).toHaveBeenLastCalledWith("john@example.com", expect.any(Object))
 
     const loginRes = await request(app)
       .post("/api/auth/login")

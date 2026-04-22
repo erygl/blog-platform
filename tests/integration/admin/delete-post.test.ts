@@ -9,8 +9,9 @@ import Comment from "../../../src/models/Comment.js"
 import Like from "../../../src/models/Like.js"
 import Tag from "../../../src/models/Tag.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 let adminToken: string

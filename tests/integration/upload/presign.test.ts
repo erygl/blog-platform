@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { app, cleanDb, loginUser, registerUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import request from "supertest"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 vi.mock("../../../src/services/upload.service.js", () => ({

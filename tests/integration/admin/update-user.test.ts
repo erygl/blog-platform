@@ -2,9 +2,11 @@ import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
 import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
 import { registerAdmin, loginAdmin } from "../../helpers/admin.helper.js"
 import User from "../../../src/models/User.js"
+import * as emailUtils from "../../../src/utils/email.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 let adminToken: string
@@ -32,6 +34,7 @@ describe("PATCH /api/admin/users/:userId", () => {
     const updated = await User.findById(user!._id).select("+refreshToken")
     expect(updated!.isBanned).toBe(true)
     expect(updated!.refreshToken).toBeNull()
+    expect(emailUtils.sendEmail).toHaveBeenLastCalledWith("john@example.com", expect.any(Object))
   })
 
   it("should force-verify user", async () => {

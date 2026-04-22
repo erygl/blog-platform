@@ -4,10 +4,11 @@ import User from "../../../src/models/User.js"
 
 let capturedResetToken: string
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined),
-  sendResetEmail: vi.fn().mockImplementation((_email: string, token: string) => {
-    capturedResetToken = token
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockImplementation((_to: string, template: { subject: string, html: string }) => {
+    const match = template.html.match(/reset-password\?token=([^"]+)/)
+    if (match) capturedResetToken = match[1]
     return Promise.resolve()
   })
 }))

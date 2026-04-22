@@ -4,8 +4,9 @@ import { createPost } from "../../helpers/post.helper.js"
 import User from "../../../src/models/User.js"
 import Follow from "../../../src/models/Follow.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 let accessToken: string

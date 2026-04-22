@@ -6,9 +6,11 @@ import Post from "../../../src/models/Post.js"
 import Like from "../../../src/models/Like.js"
 import Comment from "../../../src/models/Comment.js"
 import Follow from "../../../src/models/Follow.js"
+import * as emailUtils from "../../../src/utils/email.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 let accessToken: string
@@ -34,6 +36,7 @@ describe("DELETE /api/users/me", () => {
 
     const user = await User.findOne({ username: "john" })
     expect(user).toBeNull()
+    expect(emailUtils.sendEmail).toHaveBeenLastCalledWith("john@example.com", expect.any(Object))
   })
 
   it("should delete all posts belonging to the user", async () => {

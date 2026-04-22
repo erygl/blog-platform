@@ -3,9 +3,11 @@ import { app, request, cleanDb, registerUser } from "../../helpers/auth.helper.j
 
 let capturedToken: string
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockImplementation((_email, token) => {
-    capturedToken = token
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockImplementation((_to, template: { subject: string, html: string }) => {
+    const match = template.html.match(/verify-email\?token=([^"]+)/)
+    if (match) capturedToken = match[1]
     return Promise.resolve()
   })
 }))

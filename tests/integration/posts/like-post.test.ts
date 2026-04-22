@@ -3,8 +3,9 @@ import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, log
 import User from "../../../src/models/User.js"
 import { createPost } from "../../helpers/post.helper.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 let postSlug: string

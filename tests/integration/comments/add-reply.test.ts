@@ -5,8 +5,9 @@ import { createComment, createReply } from "../../helpers/comment.helper.js"
 import Comment from "../../../src/models/Comment.js"
 import Post from "../../../src/models/Post.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 let accessToken: string

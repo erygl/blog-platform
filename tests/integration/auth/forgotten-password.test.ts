@@ -3,9 +3,9 @@ import { app, request, cleanDb, registerUser } from "../../helpers/auth.helper.j
 import User from "../../../src/models/User.js"
 import * as emailUtils from "../../../src/utils/email.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined),
-  sendResetEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 afterEach(async () => {
@@ -26,7 +26,7 @@ describe("POST api/auth/forgotten-password", () => {
 
     expect(user?.passwordResetToken).toBeTruthy()
     expect(user?.passwordResetTokenExpiry).toBeTruthy()
-    expect(emailUtils.sendResetEmail).toHaveBeenCalledWith("john@example.com", expect.any(String))
+    expect(emailUtils.sendEmail).toHaveBeenLastCalledWith("john@example.com", expect.any(Object))
   })
 
   it("should return 200 even if email does not exist", async () => {
@@ -35,7 +35,7 @@ describe("POST api/auth/forgotten-password", () => {
       .send({ email: "nonexistent@example.com" })
 
     expect(res.status).toBe(200)
-    expect(emailUtils.sendResetEmail).not.toHaveBeenCalled()
+    expect(emailUtils.sendEmail).not.toHaveBeenCalled()
   })
 
   it("should return 400 if email is invalid", async () => {

@@ -2,8 +2,9 @@ import { afterEach, vi, describe, it, expect } from "vitest"
 import * as emailUtils from "../../../src/utils/email.js"
 import { app, request, cleanDb } from "../../helpers/auth.helper.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 afterEach(async () => {
@@ -26,10 +27,7 @@ describe("POST api/auth/register", () => {
     expect(res.body.user).toHaveProperty("username", "john")
     expect(res.body.user).toHaveProperty("name", "John Doe")
     expect(res.body.user).not.toHaveProperty("password")
-    expect(emailUtils.sendVerificationEmail).toHaveBeenCalledWith(
-      "john@example.com",
-      expect.any(String)
-    )
+    expect(emailUtils.sendEmail).toHaveBeenCalledWith("john@example.com", expect.any(Object))
   })
 
   it("should return 409, if email already exists ", async () => {

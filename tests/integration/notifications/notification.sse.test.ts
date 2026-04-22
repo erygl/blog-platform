@@ -12,8 +12,9 @@ import { createPost } from "../../helpers/post.helper.js"
 import { initSSE, sseClients } from "../../../src/services/notification.service.js"
 import User from "../../../src/models/User.js"
 
-vi.mock("../../../src/utils/email.js", () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined)
+vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
+  ...await importOriginal(),
+  sendEmail: vi.fn().mockResolvedValue(undefined)
 }))
 
 beforeAll(() => {
