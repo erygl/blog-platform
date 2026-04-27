@@ -1,5 +1,6 @@
 import { Router } from "express";
 import authMiddleware from "../middleware/auth.js";
+import optionalAuth from "../middleware/optionalAuth.js";
 import requireVerified from "../middleware/requireVerified.js";
 import {
   getMyProfile,
@@ -25,8 +26,8 @@ router.route("/me")
 router.route("/me/likes").get(authMiddleware, getLikedPosts)
 router.route("/me/email").patch(authMiddleware, updateEmail)
 router.route("/me/password").patch(authMiddleware, updatePassword)
-router.route("/:username").get(getPublicProfile)
-router.route("/:username/posts").get(getPostsByUsername)
+router.route("/:username").get(optionalAuth, getPublicProfile)
+router.route("/:username/posts").get(optionalAuth, getPostsByUsername)
 router.route("/:username/follow")
   .post(authMiddleware, requireVerified, followUser)
   .delete(authMiddleware, unfollowUser)

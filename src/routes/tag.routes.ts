@@ -1,4 +1,5 @@
 import { Router } from "express";
+import optionalAuth from "../middleware/optionalAuth.js";
 import {
   getPopularTags,
   getTagWithPosts
@@ -7,6 +8,6 @@ import {
 const router = Router()
 
 router.route("/").get(getPopularTags)
-router.route("/:tagSlug").get(getTagWithPosts)
+router.route("/:tagSlug").get(optionalAuth, getTagWithPosts)
 
 export default router

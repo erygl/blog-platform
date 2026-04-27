@@ -1,5 +1,6 @@
 import { Router } from "express";
 import authMiddleware from "../middleware/auth.js";
+import optionalAuth from "../middleware/optionalAuth.js";
 import requireVerified from "../middleware/requireVerified.js";
 import {
   getTrendingPosts,
@@ -17,13 +18,13 @@ import {
 
 const router = Router()
 router.route("/")
-  .get(getTrendingPosts)
+  .get(optionalAuth, getTrendingPosts)
   .post(authMiddleware, requireVerified, createPost)
 router.route("/feed").get(authMiddleware, getFeed)
 router.route("/me/drafts").get(authMiddleware, getDrafts)
 router.route("/me/drafts/:postSlug").get(authMiddleware, getSingleDraft)
 router.route("/:postSlug")
-  .get(getSinglePost)
+  .get(optionalAuth, getSinglePost)
   .put(authMiddleware, requireVerified, updatePost)
   .delete(authMiddleware, deletePost)
 router.route("/:postSlug/like")
