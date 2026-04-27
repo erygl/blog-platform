@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
+import { blockUser } from "../../helpers/block.helper.js"
 import Tag from "../../../src/models/Tag.js"
 
 vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
@@ -104,5 +105,33 @@ describe("GET /api/search", () => {
     expect(res.status).toBe(200)
     expect(res.body.results).toHaveLength(0)
     expect(res.body.hasMore).toBe(false)
+  })
+
+  it("should not return posts from blocked authors in post search", async () => {
+    await registerSecondUser()
+    const { accessToken: janeToken } = await loginSecondUser()
+    await createPost(janeToken, { title: "Blocked Author Post" })
+
+    await blockUser(accessToken, "jane")
+
+    const res = await request(app)
+      .get("/api/search?q=Blocked&type=posts")
+      .set("Authorization", `Bearer ${accessToken}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.results).toHaveLength(0)
+  })
+
+  it("should not return blocked users in user search", async () => {
+    await registerSecondUser()
+    const { accessToken: janeToken } = await loginSecondUser()
+    await blockUser(janeToken, "john")
+
+    const res = await request(app)
+      .get("/api/search?q=jane&type=users")
+      .set("Authorization", `Bearer ${accessToken}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.results).toHaveLength(0)
   })
 })

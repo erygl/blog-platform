@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
+import { blockUser } from "../../helpers/block.helper.js"
 
 vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
   ...await importOriginal(),
@@ -77,6 +78,18 @@ describe("GET /api/users/:username/posts", () => {
 
   it("should return 404 if user not found", async () => {
     const res = await request(app).get("/api/users/nonexistent/posts")
+    expect(res.status).toBe(404)
+  })
+
+  it("should return 404 if the target user has blocked the viewer", async () => {
+    await registerSecondUser()
+    const { accessToken: janeToken } = await loginSecondUser()
+    await blockUser(janeToken, "john")
+
+    const res = await request(app)
+      .get("/api/users/jane/posts")
+      .set("Authorization", `Bearer ${accessToken}`)
+
     expect(res.status).toBe(404)
   })
 })

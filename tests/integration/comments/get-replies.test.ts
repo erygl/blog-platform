@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
 import { createComment, createReply } from "../../helpers/comment.helper.js"
+import { blockUser } from "../../helpers/block.helper.js"
+import User from "../../../src/models/User.js"
 
 vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
   ...await importOriginal(),
@@ -68,5 +70,31 @@ describe("GET /api/posts/:postSlug/comments/:commentId/replies", () => {
     const res = await request(app)
       .get(`/api/posts/${postSlug}/comments/000000000000000000000000/replies`)
     expect(res.status).toBe(404)
+  })
+
+  it("should not return replies from blocked authors", async () => {
+    // bob owns the post and the parent comment, jane replies, john blocks jane and views
+    await request(app)
+      .post("/api/auth/register")
+      .send({ username: "bob", name: "Bob", email: "bob@example.com", password: "Password1" })
+    await User.updateOne({ username: "bob" }, { isVerified: true })
+    const { body: { accessToken: bobToken } } = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "bob@example.com", password: "Password1" })
+    const bobPost = await createPost(bobToken)
+    const bobComment = await createComment(bobToken, bobPost.slug)
+
+    await registerSecondUser()
+    const { accessToken: janeToken } = await loginSecondUser()
+    await createReply(janeToken, bobPost.slug, bobComment._id)
+
+    await blockUser(accessToken, "jane")
+
+    const res = await request(app)
+      .get(`/api/posts/${bobPost.slug}/comments/${bobComment._id}/replies`)
+      .set("Authorization", `Bearer ${accessToken}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.replies).toHaveLength(0)
   })
 })

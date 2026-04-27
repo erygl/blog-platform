@@ -94,4 +94,21 @@ describe("GET /api/bookmarks", () => {
     const res = await request(app).get("/api/bookmarks")
     expect(res.status).toBe(401)
   })
+
+  it("should not return bookmarked posts from blocked authors", async () => {
+    await request(app)
+      .post(`/api/bookmarks/${postSlug}`)
+      .set("Authorization", `Bearer ${readerToken}`)
+
+    await request(app)
+      .post(`/api/blocks/john`)
+      .set("Authorization", `Bearer ${readerToken}`)
+
+    const res = await request(app)
+      .get("/api/bookmarks")
+      .set("Authorization", `Bearer ${readerToken}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.bookmarks).toHaveLength(0)
+  })
 })

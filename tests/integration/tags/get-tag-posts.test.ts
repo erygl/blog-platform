@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, vi, describe, it, expect } from "vitest"
-import { app, request, cleanDb, registerUser, loginUser } from "../../helpers/auth.helper.js"
+import { app, request, cleanDb, registerUser, loginUser, registerSecondUser, loginSecondUser } from "../../helpers/auth.helper.js"
 import { createPost } from "../../helpers/post.helper.js"
+import { blockUser } from "../../helpers/block.helper.js"
 
 vi.mock("../../../src/utils/email.js", async (importOriginal) => ({
   ...await importOriginal(),
@@ -78,5 +79,20 @@ describe("GET /api/tags/:tagSlug", () => {
     expect(res.status).toBe(200)
     expect(res.body.posts).toHaveLength(0)
     expect(res.body.hasMore).toBe(false)
+  })
+
+  it("should not return posts from blocked authors", async () => {
+    await registerSecondUser()
+    const { accessToken: janeToken } = await loginSecondUser()
+    await createPost(janeToken, { title: "Jane TypeScript Post", tags: ["typescript"] })
+
+    await blockUser(accessToken, "jane")
+
+    const res = await request(app)
+      .get("/api/tags/typescript")
+      .set("Authorization", `Bearer ${accessToken}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.posts).toHaveLength(0)
   })
 })
