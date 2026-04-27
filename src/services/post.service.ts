@@ -6,6 +6,7 @@ import { ConflictError, NotFoundError } from "../errors/index.js";
 import Like from "../models/Like.js";
 import mongoose, { mongo, Types } from "mongoose";
 import Follow from "../models/Follow.js"
+import { assertNotBlocked, getBlockedIds } from "./block.service.js"
 import { calcTrendingScore } from "../jobs/trendingScore.job.js"
 import { estimatedReadTime } from "../utils/readTime.js";
 import { decode, paginate } from "../utils/cursor.js";
@@ -34,7 +35,7 @@ const resolveTagIds = async (tagNames: string[]) => {
   return normalized.map(name => tags.find(t => t.name === name)!._id)
 }
 
-const getTrendingPosts = async (cursor: string | undefined, limit: number) => {
+const getTrendingPosts = async (cursor: string | undefined, limit: number, userId?: string) => {
   const cursorFilter = cursor ? (() => {
     const { score, id } = decode<{ score: number, id: string }>(cursor)
     return {
@@ -45,11 +46,16 @@ const getTrendingPosts = async (cursor: string | undefined, limit: number) => {
     }
   })() : {}
 
-  const posts = await Post.find({ status: "published", ...cursorFilter })
+  const blockedIds = userId ? await getBlockedIds(userId) : []
+  const authorFilter = blockedIds.length > 0 ? { author: { $nin: blockedIds } } : {}
+
+  const posts = await Post.find(
+    { status: "published", ...cursorFilter, ...authorFilter }
+  )
     .sort({ trendingScore: -1, _id: -1 })
     .limit(limit + 1)
     .select("title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt trendingScore")
-    .populate("author", "-_id username name avatar")
+    .populate("author", "username name avatar")
     .lean()
 
   const { data, hasMore, nextCursor } = paginate(
@@ -181,19 +187,26 @@ const getSingleDraft = async (userId: string, postSlug: string) => {
   return draft
 }
 
-const getSinglePost = async (postSlug: string) => {
+const getSinglePost = async (postSlug: string, viewerId?: string) => {
   const post = await Post.findOneAndUpdate(
     { slug: postSlug, status: "published" },
     { $inc: { viewsCount: 1 } },
     { returnDocument: "after" }
   )
     .select("-_id -status -excerpt -trendingScore -createdAt -updatedAt")
-    .populate("author", "-_id username name avatar")
+    .populate("author", "_id username name avatar")
     .populate("tags", "-_id name slug")
     .lean()
 
   if (!post) throw new NotFoundError("Post not found")
-  return post
+
+  const author = post.author as unknown as {
+    _id: Types.ObjectId; username: string; name: string; avatar: string
+  }
+  if (viewerId) await assertNotBlocked(viewerId, author._id.toString())
+
+  const { _id, ...authorWithout } = author
+  return { ...post, author: authorWithout }
 }
 
 const updatePost = async (

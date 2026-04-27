@@ -11,6 +11,7 @@ import Follow from "../models/Follow.js"
 import Tag from "../models/Tag.js"
 import { decode, paginate } from "../utils/cursor.js"
 import notificationEmitter from "../config/notificationEmitter.js"
+import { assertNotBlocked } from "./block.service.js"
 
 const getMyProfile = async (userId: string) => {
   const user = await User.findById(userId)
@@ -282,11 +283,13 @@ const updatePassword = async (
     .catch(err => console.error("Email failed:", err))
 }
 
-const getPublicProfile = async (username: string) => {
+const getPublicProfile = async (username: string, viewerId?: string) => {
   const user = await User.findOne({ username: username })
     .select("_id username name avatar bio followersCount followingCount")
     .lean()
   if (!user) throw new NotFoundError("User not found")
+
+  if (viewerId) await assertNotBlocked(viewerId, user._id.toString())
 
   const totalPosts = await Post.countDocuments({ author: user._id, status: "published" })
   const { _id, ...rest } = user
@@ -296,10 +299,13 @@ const getPublicProfile = async (username: string) => {
 const getPostsByUsername = async (
   username: string,
   cursor: string | undefined,
-  limit: number
+  limit: number,
+  viewerId?: string
 ) => {
   const user = await User.findOne({ username: username }).select("_id").lean()
   if (!user) throw new NotFoundError("User not found")
+
+  if (viewerId) await assertNotBlocked(viewerId, user._id.toString())
 
   const cursorFilter = cursor
     ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }

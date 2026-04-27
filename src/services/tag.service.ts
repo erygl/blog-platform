@@ -3,6 +3,7 @@ import Post from "../models/Post.js"
 import Tag from "../models/Tag.js"
 import { Types } from "mongoose"
 import { decode, paginate } from "../utils/cursor.js"
+import { getBlockedIds } from "./block.service.js"
 
 const getPopularTags = async (limit: number) => {
   const tags = await Tag.find({ postCount: { $gt: 0 } })
@@ -17,7 +18,8 @@ const getPopularTags = async (limit: number) => {
 const getTagWithPosts = async (
   tagSlug: string,
   cursor: string | undefined,
-  limit: number
+  limit: number,
+  userId?: string
 ) => {
   const tag = await Tag.findOne({ slug: tagSlug })
     .select("_id name postCount")
@@ -34,7 +36,10 @@ const getTagWithPosts = async (
     }
   })() : {}
 
-  const posts = await Post.find({ tags: tag._id, status: "published", ...cursorFilter })
+  const blockedIds = userId ? await getBlockedIds(userId) : []
+  const blockFilter = blockedIds.length > 0 ? { author: { $nin: blockedIds } } : {}
+
+  const posts = await Post.find({ tags: tag._id, status: "published", ...cursorFilter, ...blockFilter })
     .sort({ trendingScore: -1, _id: -1 })
     .limit(limit + 1)
     .select("title author coverImage excerpt slug likesCount commentsCount trendingScore")

@@ -6,7 +6,7 @@ const getPostComments = async (req: Request, res: Response) => {
   const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
   const postSlug = req.params.postSlug as string
-  const { comments, hasMore, nextCursor } = await commentService.getPostComments(postSlug, cursor, limit)
+  const { comments, hasMore, nextCursor } = await commentService.getPostComments(postSlug, cursor, limit, req.user?.userId)
   res.status(200).json({ comments, hasMore, nextCursor })
 }
 
@@ -65,7 +65,7 @@ const getCommentReplies = async (req: Request, res: Response) => {
   const commentId = req.params.commentId as string
   const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { replies, hasMore, nextCursor } = await commentService.getCommentReplies(postSlug, commentId, cursor, limit)
+  const { replies, hasMore, nextCursor } = await commentService.getCommentReplies(postSlug, commentId, cursor, limit, req.user?.userId)
   res.status(200).json({ replies, hasMore, nextCursor })
 }
 

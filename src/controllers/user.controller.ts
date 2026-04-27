@@ -52,7 +52,7 @@ const updatePassword = async (req: Request, res: Response) => {
 
 const getPublicProfile = async (req: Request, res: Response) => {
   const username = req.params.username as string
-  const user = await userService.getPublicProfile(username)
+  const user = await userService.getPublicProfile(username, req.user?.userId)
   res.status(200).json({ user })
 }
 
@@ -60,7 +60,7 @@ const getPostsByUsername = async (req: Request, res: Response) => {
   const username = req.params.username as string
   const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { posts, hasMore, nextCursor } = await userService.getPostsByUsername(username, cursor, limit)
+  const { posts, hasMore, nextCursor } = await userService.getPostsByUsername(username, cursor, limit, req.user?.userId)
   res.status(200).json({ posts, hasMore, nextCursor })
 }
 

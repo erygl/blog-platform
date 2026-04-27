@@ -3,6 +3,7 @@ import { ConflictError, NotFoundError } from "../errors/index.js"
 import Bookmark from "../models/Bookmark.js"
 import Post from "../models/Post.js"
 import { decode, paginate } from "../utils/cursor.js"
+import { getBlockedIds } from "./block.service.js"
 
 const addBookmark = async (postSlug: string, userId: string): Promise<void> => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
@@ -35,13 +36,16 @@ const getBookmarks = async (userId: string, cursor: string | undefined, limit: n
     ? { _id: { $lt: new Types.ObjectId(decode<{ id: string }>(cursor).id) } }
     : {}
 
+  const blockedIds = await getBlockedIds(userId)
+  const blockFilter = blockedIds.length > 0 ? { author: { $nin: blockedIds } } : {}
+
   const bookmarks = await Bookmark.find({ user: userId, ...cursorFilter })
     .sort({ _id: -1 })
     .limit(limit + 1)
     .select("post")
     .populate({
       path: "post",
-      match: { status: "published" },
+      match: { status: "published", ...blockFilter },
       select: "-_id title slug excerpt author coverImage likesCount commentsCount viewsCount publishedAt",
       populate: {
         path: "author",

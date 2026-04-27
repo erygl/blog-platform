@@ -5,7 +5,7 @@ import * as postValidation from "../validations/post.validation.js"
 const getTrendingPosts = async (req: Request, res: Response) => {
   const cursor = req.query.cursor as string | undefined
   const limit = Number(req.query.limit) || 10
-  const { posts, hasMore, nextCursor } = await postService.getTrendingPosts(cursor, limit)
+  const { posts, hasMore, nextCursor } = await postService.getTrendingPosts(cursor, limit, req.user?.userId)
   res.status(200).json({ posts, hasMore, nextCursor })
 }
 
@@ -41,7 +41,7 @@ const getSingleDraft = async (req: Request, res: Response) => {
 
 const getSinglePost = async (req: Request, res: Response) => {
   const postSlug = req.params.postSlug as string
-  const post = await postService.getSinglePost(postSlug)
+  const post = await postService.getSinglePost(postSlug, req.user?.userId)
   res.status(200).json({ post })
 }
 

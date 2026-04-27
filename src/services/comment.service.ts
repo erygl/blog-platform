@@ -5,11 +5,13 @@ import Like from "../models/Like.js"
 import mongoose, { mongo, Types } from "mongoose"
 import { decode, paginate } from "../utils/cursor.js"
 import notificationEmitter from "../config/notificationEmitter.js"
+import { getBlockedIds } from "./block.service.js"
 
 const getPostComments = async (
   postSlug: string,
   cursor: string | undefined,
-  limit: number) => {
+  limit: number,
+  userId?: string) => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
     .select("_id")
     .lean()
@@ -25,8 +27,11 @@ const getPostComments = async (
     }
   })() : {}
 
+  const blockedIds = userId ? await getBlockedIds(userId) : []
+  const blockFilter = blockedIds.length > 0 ? { author: { $nin: blockedIds } } : {}
+
   const comments = await Comment.find(
-    { post: post._id, parentComment: null, ...cursorFilter }
+    { post: post._id, parentComment: null, ...cursorFilter, ...blockFilter }
   )
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
@@ -262,7 +267,8 @@ const getCommentReplies = async (
   postSlug: string,
   commentId: string,
   cursor: string | undefined,
-  limit: number
+  limit: number,
+  userId?: string
 ) => {
   const post = await Post.findOne({ slug: postSlug, status: "published" })
     .select("_id")
@@ -286,7 +292,12 @@ const getCommentReplies = async (
     }
   })() : {}
 
-  const replies = await Comment.find({ post: post._id, parentComment: comment._id, ...cursorFilter })
+  const blockedIds = userId ? await getBlockedIds(userId) : []
+  const blockFilter = blockedIds.length > 0 ? { author: { $nin: blockedIds } } : {}
+
+  const replies = await Comment.find(
+    { post: post._id, parentComment: comment._id, ...cursorFilter, ...blockFilter }
+  )
     .sort({ createdAt: 1, _id: 1 })
     .limit(limit + 1)
     .select("-post -repliesCount")

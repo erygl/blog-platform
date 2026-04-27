@@ -1,19 +1,24 @@
 import Post from "../models/Post.js";
 import Tag from "../models/Tag.js";
 import User from "../models/User.js";
+import { getBlockedIds } from "./block.service.js"
+import { Types } from "mongoose"
 
 const search = async (
   type: string,
   query: string,
   page: number,
-  limit: number
+  limit: number,
+  userId?: string
 ) => {
   const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   const skip = (page - 1) * limit
+  const blockedIds = userId ? await getBlockedIds(userId) : []
   let result;
   if (type === "posts") {
+    const blockFilter = blockedIds.length > 0 ? { author: { $nin: blockedIds } } : {}
     result = await Post.find({
-      title: { $regex: escaped, $options: "i" }, status: "published"
+      title: { $regex: escaped, $options: "i" }, status: "published", ...blockFilter
     })
       .sort({ trendingScore: -1 })
       .skip(skip)
@@ -23,11 +28,13 @@ const search = async (
       .lean()
   }
   else if (type === "users") {
+    const blockFilter = blockedIds.length > 0 ? { _id: { $nin: blockedIds } } : {}
     result = await User.find({
       $or: [
         { username: { $regex: escaped, $options: "i" } },
         { name: { $regex: escaped, $options: "i" } }
-      ]
+      ],
+      ...blockFilter
     })
       .sort({ followersCount: -1 })
       .skip(skip)

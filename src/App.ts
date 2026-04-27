@@ -12,6 +12,7 @@ import adminRouter from "./routes/admin.routes.js"
 import bookmarkRouter from "./routes/bookmark.routes.js"
 import uploadRouter from "./routes/upload.routes.js"
 import notificationRouter from "./routes/notification.routes.js"
+import blockRouter from "./routes/block.routes.js"
 import { errorHandler } from "./middleware/errorHandler.js"
 import authMiddleware from "./middleware/auth.js"
 import requireAdmin from "./middleware/requireAdmin.js"
@@ -38,6 +39,7 @@ app.use("/api/admin", authMiddleware, requireAdmin, adminRouter)
 app.use("/api/bookmarks", bookmarkRouter)
 app.use("/api/upload", uploadRouter)
 app.use("/api/notifications", notificationRouter)
+app.use("/api/blocks", blockRouter)
 
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" })
