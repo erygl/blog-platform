@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-surface: #fcf9f8;
+  --color-surface-dim: #dcd9d9;
+  --color-surface-bright: #fcf9f8;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f6f3f2;
+  --color-surface-container: #f0eded;
+  --color-surface-container-high: #eae7e7;
+  --color-surface-container-highest: #e4e2e1;
+  --color-surface-variant: #e4e2e1;
+  --color-surface-tint: #43655c;
+  --color-on-surface: #1b1c1c;
+  --color-on-surface-variant: #414846;
+  --color-inverse-surface: #303030;
+  --color-inverse-on-surface: #f3f0f0;
+
+  --color-primary: #01261f;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #1a3c34;
+  --color-on-primary-container: #83a69c;
+  --color-primary-fixed: #c5eadf;
+  --color-primary-fixed-dim: #aacec3;
+  --color-on-primary-fixed: #00201a;
+  --color-on-primary-fixed-variant: #2b4d44;
+  --color-inverse-primary: #aacec3;
+
+  --color-secondary: #645d53;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #e8ded1;
+  --color-on-secondary-container: #686257;
+  --color-secondary-fixed: #ebe1d4;
+  --color-secondary-fixed-dim: #cfc5b9;
+  --color-on-secondary-fixed: #1f1b13;
+  --color-on-secondary-fixed-variant: #4c463c;
+
+  --color-tertiary: #371900;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #572a00;
+  --color-on-tertiary-container: #e18a41;
+  --color-tertiary-fixed: #ffdcc4;
+  --color-tertiary-fixed-dim: #ffb781;
+  --color-on-tertiary-fixed: #2f1400;
+  --color-on-tertiary-fixed-variant: #6f3800;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-outline: #717976;
+  --color-outline-variant: #c1c8c4;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.75rem;
+  --spacing-base: 0.5rem;
+  --spacing-md: 1.5rem;
+  --spacing-lg: 3rem;
+  --spacing-xl: 5rem;
+  --spacing-gutter: 1.5rem;
+
+  /* Font families */
+  --font-headline: "Newsreader", serif;
+  --font-body: "Manrope", sans-serif;
+
+  /* Font sizes */
+  --text-body-sm: 0.875rem;
+  --text-body-md: 1rem;
+  --text-body-xl: 1.25rem;
+  --text-headline-sm: 1.5rem;
+  --text-headline-md: 2rem;
+  --text-headline-lg: 3rem;
+  --text-display-xl: 4rem;
+  --text-quote: 1.75rem;
+  --text-label-md: 0.75rem;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+}
