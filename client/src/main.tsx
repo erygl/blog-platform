@@ -1,10 +1,19 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
-import App from './App.tsx'
+import Home from './pages/Home.tsx'
+import ResetPassword from './pages/ResetPassword.tsx'
+import EmailVerified from './pages/EmailVerified.tsx'
+
+const router = createBrowserRouter([
+  { index: true, element: <Home /> },
+  { path: "/reset-password", element: <ResetPassword /> },
+  { path: "/email-verified", element: <EmailVerified /> },
+])
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-      <App />
+    <RouterProvider router={router} />
   </StrictMode>
 )
